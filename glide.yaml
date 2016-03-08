@@ -1,0 +1,6 @@
+package: github.com/30x/enrober
+import:
+- package: k8s.io/kubernetes
+  subpackages:
+  - pkg/client/unversioned
+  - pkg/client/api
