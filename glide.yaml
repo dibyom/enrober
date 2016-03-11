@@ -4,3 +4,4 @@ import:
   subpackages:
   - pkg/client/unversioned
   - pkg/client/api
+- package: github.com/stretchr/testify

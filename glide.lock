@@ -1,5 +1,5 @@
-hash: 6805d05d25fbc26d763565652b5aac05b5963aa54dee1c02ee30ac9968252371
-updated: 2016-03-08T14:57:10.426499708-07:00
+hash: 0a687e00843eef2b359882dde464407d2f35e60900a6279f183fcf918536cb16
+updated: 2016-03-09T12:40:54.868435487-07:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c
@@ -67,6 +67,10 @@ imports:
   - pbutil
 - name: github.com/pborman/uuid
   version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
 - name: github.com/prometheus/client_golang
   version: 3b78d7a77f51ccbc364d4bc170920153022cfd08
   subpackages:
@@ -84,6 +88,14 @@ imports:
   version: 490cc6eb5fa45bf8a8b7b73c8bc82a8160e8531d
 - name: github.com/spf13/pflag
   version: 08b1a584251b5b62f458943640fc8ebd4d50aaa5
+- name: github.com/stretchr/objx
+  version: d40df0cc104c06eae2dfe03d7dddb83802d52f9a
+- name: github.com/stretchr/testify
+  version: e3a8ff8ce36581f87a15341206f205b1da467059
+  subpackages:
+  - assert
+  - http
+  - mock
 - name: github.com/ugorji/go
   version: f4485b318aadd133842532f841dc205a8e339d74
   subpackages:
@@ -104,25 +116,32 @@ imports:
   subpackages:
   - pkg/client/unversioned
   - pkg/client/api
+  - pkg/api
   - pkg/client/restclient
   - pkg/labels
-  - pkg/api
-  - pkg/api/errors
+  - pkg/api/meta
+  - pkg/api/resource
   - pkg/api/unversioned
+  - pkg/auth/user
+  - pkg/conversion
+  - pkg/fields
+  - pkg/runtime
+  - pkg/runtime/serializer
+  - pkg/types
+  - pkg/util
+  - pkg/util/intstr
+  - pkg/util/rand
+  - pkg/util/sets
+  - pkg/api/errors
   - pkg/api/v1
   - pkg/api/validation
   - pkg/client/metrics
   - pkg/client/transport
-  - pkg/fields
-  - pkg/runtime
-  - pkg/util
   - pkg/util/net
-  - pkg/util/sets
   - pkg/version
   - pkg/watch
   - pkg/watch/json
   - pkg/api/install
-  - pkg/api/meta
   - pkg/apimachinery/registered
   - pkg/apis/authorization/install
   - pkg/apis/autoscaling
@@ -136,13 +155,13 @@ imports:
   - pkg/client/typed/discovery
   - pkg/util/wait
   - pkg/util/validation
-  - pkg/api/resource
-  - pkg/auth/user
-  - pkg/conversion
-  - pkg/runtime/serializer
-  - pkg/types
-  - pkg/util/intstr
-  - pkg/util/rand
+  - pkg/util/errors
+  - third_party/forked/reflect
+  - pkg/conversion/queryparams
+  - pkg/runtime/serializer/json
+  - pkg/runtime/serializer/recognizer
+  - pkg/runtime/serializer/versioning
+  - pkg/util/integer
   - pkg/util/validation/field
   - pkg/util/parsers
   - pkg/api/endpoints
@@ -150,10 +169,7 @@ imports:
   - pkg/api/service
   - pkg/api/util
   - pkg/capabilities
-  - pkg/util/errors
   - pkg/util/yaml
-  - pkg/conversion/queryparams
-  - pkg/util/integer
   - pkg/util/runtime
   - pkg/apimachinery
   - pkg/apis/authorization
@@ -165,10 +181,6 @@ imports:
   - pkg/apis/extensions/v1beta1
   - pkg/apis/metrics
   - pkg/apis/metrics/v1alpha1
-  - third_party/forked/reflect
-  - pkg/runtime/serializer/json
-  - pkg/runtime/serializer/recognizer
-  - pkg/runtime/serializer/versioning
   - pkg/util/hash
   - pkg/util/net/sets
   - pkg/kubelet/qos
