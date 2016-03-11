@@ -111,7 +111,7 @@ func (deploymentManager *DeploymentManager) GetReplicationController(imageDeploy
 }
 
 //CreateNamespace <description goes here>
-//Retuns a Namespace and an error
+//Returns a Namespace and an error
 func (deploymentManager *DeploymentManager) CreateNamespace(imageDeployment ImageDeployment) (api.Namespace, error) {
 	opt := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -125,10 +125,18 @@ func (deploymentManager *DeploymentManager) CreateNamespace(imageDeployment Imag
 	return *ns, err
 }
 
-//TODO: GetNamespace function goes here
 //GetNamespace <description goes here>
+//Returns a Namespace and an error
+func (deploymentManager *DeploymentManager) GetNamespace(imageDeployment ImageDeployment) (api.Namespace, error) {
+	ns, err := deploymentManager.client.Namespaces().Get(imageDeployment.repo)
+	if err != nil {
+		return *ns, err //TODO: Better error handling
+	}
+	return *ns, err
+}
 
 //DeleteNamespace <description goes here>
+//Returns an error
 func (deploymentManager *DeploymentManager) DeleteNamespace(imageDeployment ImageDeployment) error {
 	ns := imageDeployment.repo
 	err := deploymentManager.client.Namespaces().Delete(ns)

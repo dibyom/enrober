@@ -28,6 +28,8 @@ func TestCreateDeploymentManager(t *testing.T) {
 	assert.NotEmpty(t, deploymentManager)
 }
 
+//Replication Controller Testing
+
 func TestConstructReplicationController(t *testing.T) {
 	template := ConstructReplicationController(imageDeployment)
 
@@ -45,8 +47,41 @@ func TestCreateReplicationController(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, rc, getRc)
 }
+func TestGetReplicationControllers(t *testing.T) {
+	deploymentManager, err := CreateDeploymentManager(config)
+	assert.Nil(t, err)
+	rc, err := deploymentManager.GetReplicationController(imageDeployment)
+	assert.Nil(t, err)
+	assert.NotEmpty(t, rc)
 
-//Test ListReplicationControllers
+	// fmt.Printf("%v\n", rc)
+	imageName := imageDeployment.repo + "/" + imageDeployment.application + ":" + imageDeployment.revision
+	for _, element := range rc.Spec.Template.Spec.Containers {
+		// fmt.Printf("%v\n", element.Image)
+		assert.Equal(t, element.Image, imageName)
+	}
+}
+
+//Test UpdateReplicationController
+func TestUpdateReplicationController(t *testing.T) {
+	deploymentManager, err := CreateDeploymentManager(config)
+	assert.Nil(t, err)
+
+	//TODO: Modify imageDeployment so that we can verify it did something
+	_, err = deploymentManager.UpdateReplicationController(imageDeployment)
+	assert.Nil(t, err)
+
+	//TODO: Assertion for rc
+}
+func TestDeleteReplicationController(t *testing.T) {
+	deploymentManager, err := CreateDeploymentManager(config)
+	assert.Nil(t, err)
+
+	err = deploymentManager.DeleteReplicationController(imageDeployment)
+	assert.Nil(t, err)
+
+}
+
 func TestListReplicationControllers(t *testing.T) {
 	deploymentManager, err := CreateDeploymentManager(config)
 	assert.Nil(t, err)
@@ -66,21 +101,7 @@ func TestListReplicationControllers(t *testing.T) {
 	//TODO: Figure out actual assert condition for successful test
 }
 
-func TestGetReplicationControllers(t *testing.T) {
-	deploymentManager, err := CreateDeploymentManager(config)
-	assert.Nil(t, err)
-	rc, err := deploymentManager.GetReplicationController(imageDeployment)
-	assert.Nil(t, err)
-	assert.NotEmpty(t, rc)
-
-	// fmt.Printf("%v\n", rc)
-	imageName := imageDeployment.repo + "/" + imageDeployment.application + ":" + imageDeployment.revision
-	for _, element := range rc.Spec.Template.Spec.Containers {
-		// fmt.Printf("%v\n", element.Image)
-		assert.Equal(t, element.Image, imageName)
-	}
-}
-
+//Namespace Testing
 func TestCreateNamespace(t *testing.T) {
 	deploymentManager, err := CreateDeploymentManager(config)
 	assert.Nil(t, err)
@@ -94,14 +115,33 @@ func TestCreateNamespace(t *testing.T) {
 	assert.Equal(t, ns, *gotNs)
 }
 
-//Test UpdateReplicationController
-
-//Test DeleteReplicationController
-func TestDeleteReplicationController(t *testing.T) {
+func TestGetNamespace(t *testing.T) {
 	deploymentManager, err := CreateDeploymentManager(config)
 	assert.Nil(t, err)
 
-	err = deploymentManager.DeleteReplicationController(imageDeployment)
+	ns, err := deploymentManager.CreateNamespace(imageDeployment)
+	assert.Nil(t, err)
+
+	gotNs, err := deploymentManager.GetNamespace(imageDeployment)
+	assert.Nil(t, err)
+
+	assert.Equal(t, ns, gotNs)
+}
+func TestDeleteNamespace(t *testing.T) {
+	deploymentManager, err := CreateDeploymentManager(config)
+	assert.Nil(t, err)
+
+	err = deploymentManager.DeleteNamespace(imageDeployment)
+	assert.Nil(t, err)
+}
+func TestCreateandDeleteNamespace(t *testing.T) {
+	deploymentManager, err := CreateDeploymentManager(config)
+	assert.Nil(t, err)
+
+	_, err = deploymentManager.CreateNamespace(imageDeployment)
+	assert.Nil(t, err)
+
+	err = deploymentManager.DeleteNamespace(imageDeployment)
 	assert.Nil(t, err)
 
 }
@@ -117,10 +157,10 @@ func TestEndtoEnd(t *testing.T) {
 	assert.Nil(t, err)
 
 	//GetNamespace
-	gotNs, err := deploymentManager.client.Namespaces().Get(imageDeployment.repo)
+	gotNs, err := deploymentManager.GetNamespace(imageDeployment)
 	assert.Nil(t, err)
 
-	assert.Equal(t, ns, *gotNs)
+	assert.Equal(t, ns, gotNs)
 
 	//CreateReplicationController
 	rc, err := deploymentManager.CreateReplicationController(imageDeployment)
@@ -130,6 +170,8 @@ func TestEndtoEnd(t *testing.T) {
 	getRc, err := deploymentManager.GetReplicationController(imageDeployment)
 	assert.Nil(t, err)
 	assert.Equal(t, rc, getRc)
+
+	//TODO: Add UpdateReplicationController
 
 	//DeleteReplicationController
 	err = deploymentManager.DeleteReplicationController(imageDeployment)
@@ -144,7 +186,7 @@ func TestEndtoEnd(t *testing.T) {
 	assert.Nil(t, err)
 
 	//GetNamespace
-	gotNs, err = deploymentManager.client.Namespaces().Get(imageDeployment.repo)
+	gotNs, err = deploymentManager.GetNamespace(imageDeployment)
 	assert.Nil(t, err)
 	assert.Equal(t, string(gotNs.Status.Phase), "Terminating")
 
