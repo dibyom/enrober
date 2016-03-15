@@ -62,20 +62,35 @@ func TestGetReplicationControllers(t *testing.T) {
 	}
 }
 
+//TODO: Have modified ImageDeployment for update to verify it works
 //Test UpdateReplicationController
 func TestUpdateReplicationController(t *testing.T) {
 	deploymentManager, err := CreateDeploymentManager(config)
 	assert.Nil(t, err)
 
-	//TODO: Modify imageDeployment so that we can verify it did something
-	_, err = deploymentManager.UpdateReplicationController(imageDeployment)
+	var imageDeployment2 = ImageDeployment{
+		repositoryURI: "testURI",
+		repo:          "jbowen",
+		application:   "testapp",
+		revision:      "v0",
+		virtualHosts:  []string{},
+		servedPaths:   []string{},
+		podCount:      3,
+	}
+
+	rc, err := deploymentManager.UpdateReplicationController(imageDeployment2)
 	assert.Nil(t, err)
 
-	//TODO: Assertion for rc
+	getRc, err := deploymentManager.GetReplicationController(imageDeployment2)
+	assert.Nil(t, err)
+	assert.Equal(t, rc, getRc)
 }
+
 func TestDeleteReplicationController(t *testing.T) {
 	deploymentManager, err := CreateDeploymentManager(config)
 	assert.Nil(t, err)
+
+	//TODO: UpdateReplicationController to have 0 replicas
 
 	err = deploymentManager.DeleteReplicationController(imageDeployment)
 	assert.Nil(t, err)
@@ -172,6 +187,18 @@ func TestEndtoEnd(t *testing.T) {
 	assert.Equal(t, rc, getRc)
 
 	//TODO: Add UpdateReplicationController
+	var imageDeployment2 = ImageDeployment{
+		repositoryURI: "testURI",
+		repo:          "jbowen",
+		application:   "testapp",
+		revision:      "v0",
+		virtualHosts:  []string{},
+		servedPaths:   []string{},
+		podCount:      3,
+	}
+
+	rc, err = deploymentManager.UpdateReplicationController(imageDeployment2)
+	assert.Nil(t, err)
 
 	//DeleteReplicationController
 	err = deploymentManager.DeleteReplicationController(imageDeployment)
