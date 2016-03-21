@@ -1,5 +1,6 @@
 //Top Level TODOs go here
 
+//TODO: Decide on better naming scheme
 //TODO: Make sure all functions have proper description
 //TODO: Make sure all functions have proper error handling
 
@@ -7,6 +8,8 @@ package enrober
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -19,14 +22,17 @@ type DeploymentManager struct {
 
 //ImageDeployment is a collection of necesarry resources for Replication Controller Deployments
 type ImageDeployment struct {
-	repositoryURI string
-	repo          string
-	application   string
-	revision      string
-	virtualHosts  []string
-	servedPaths   []string
-	podCount      int
+	//repositoryURI string
+	repo         string
+	application  string
+	revision     string
+	trafficHosts []string
+	publicPaths  []string
+	publicPort   string
+	podCount     int
 }
+
+//TODO: Rename DeploymentManager to something less likely to collid with Deployments
 
 //CreateDeploymentManager creates an instance of the DeploymentManager from the config passed in, and returns the instance
 func CreateDeploymentManager(config restclient.Config) (*DeploymentManager, error) {
@@ -39,75 +45,6 @@ func CreateDeploymentManager(config restclient.Config) (*DeploymentManager, erro
 		client: client,
 	}
 	return DeploymentManager, nil
-}
-
-//DeleteReplicationController <description goes here>
-//Returns an error
-//Delete will only remove a single ReplicationController
-func (deploymentManager *DeploymentManager) DeleteReplicationController(imageDeployment ImageDeployment) error {
-	err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Delete(imageDeployment.application)
-	if err != nil {
-		return err //TODO: Better error handling
-	}
-	return nil
-}
-
-//ListReplicationControllers <description goes here>
-//Returns a ReplicationControllerList and an error
-//TODO: Should only be passing in label selectors
-func (deploymentManager *DeploymentManager) ListReplicationControllers(imageDeployment ImageDeployment) (*api.ReplicationControllerList, error) {
-	//TODO: If one option isn't passed in then set it to all or none
-	//Need labels to be exclusive, fewer labels == more results
-	selector, err := labels.Parse("repo=" + imageDeployment.repo + "," +
-		"application=" + imageDeployment.application + "," +
-		"revision=" + imageDeployment.revision)
-	if err != nil {
-		return nil, err //TODO: Better error handling
-	}
-
-	options := api.ListOptions{
-		LabelSelector: selector,
-	}
-
-	controllers, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).List(options)
-	if err != nil {
-		return nil, err //TODO: Better error handling
-	}
-
-	return controllers, nil
-}
-
-//UpdateReplicationController <description goes here>
-//Returns a ReplicationController and an error
-func (deploymentManager *DeploymentManager) UpdateReplicationController(imageDeployment ImageDeployment) (api.ReplicationController, error) {
-	template := ConstructReplicationController(imageDeployment)
-	rcResult, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Update(&template)
-	if err != nil {
-		return *rcResult, err //TODO: Better error handling
-	}
-
-	return *rcResult, nil
-}
-
-//CreateReplicationController <description goes here>
-//Returns a ReplicationController and an error
-func (deploymentManager *DeploymentManager) CreateReplicationController(imageDeployment ImageDeployment) (api.ReplicationController, error) {
-	template := ConstructReplicationController(imageDeployment)
-	rcResult, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Create(&template)
-	if err != nil {
-		return *rcResult, err //TODO: Better error handling
-	}
-	return *rcResult, nil
-}
-
-//GetReplicationController <description goes here>
-//Returns a ReplicationController and an error
-func (deploymentManager *DeploymentManager) GetReplicationController(imageDeployment ImageDeployment) (api.ReplicationController, error) {
-	rc, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Get(imageDeployment.application)
-	if err != nil {
-		return *rc, err //TODO: Better error handling
-	}
-	return *rc, err
 }
 
 //CreateNamespace <description goes here>
@@ -146,6 +83,144 @@ func (deploymentManager *DeploymentManager) DeleteNamespace(imageDeployment Imag
 	return nil
 }
 
+//constructDeployment creates a deployment object from the passed arguments and a default deployment template
+func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment {
+	depTemplate := extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name: imageDeployment.application + "-" + imageDeployment.revision, //May take variable
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: imageDeployment.podCount, //Takes imageDeployment.podCount
+			Selector: &unversioned.LabelSelector{ //Deployment Labels go here
+				MatchLabels: map[string]string{
+					"repo":        imageDeployment.repo,
+					"application": imageDeployment.application,
+					"revision":    imageDeployment.revision,
+				},
+			},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						//TODO: Are these at the Pod or Deployment Level?
+						"repo":         imageDeployment.repo,
+						"application":  imageDeployment.application,
+						"revision":     imageDeployment.revision,
+						"microservice": "true",
+					},
+					Annotations: map[string]string{
+						//TODO: Make Optional
+						"trafficHosts": "", //TODO: Make concatenated string
+						//"trafficHosts": imageDeployment.trafficHosts[0], //TODO: Make concatenated string
+						//"publicPaths":  imageDeployment.publicPaths[0],  //TODO: Make concatenated string
+						//"publicPort":   imageDeployment.publicPort,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "test1",
+							Image: imageDeployment.repo + "/" + imageDeployment.application + ":" + imageDeployment.revision,
+							//ReadinessProbe goes here
+							//TODO: Implementation details
+							/*
+								ReadinessProbe: &api.Probe{
+									Handler: api.Handler{
+										HTTPGet: &api.HTTPGetAction{
+											Path: "/ready", //TODO: This should be determined based on an annotation
+											Port: intstr.FromInt(8080),
+										},
+									},
+								},*/
+						},
+					},
+				},
+			},
+		},
+		Status: extensions.DeploymentStatus{},
+	}
+	return depTemplate
+}
+
+//CreateDeployment <description goes here>
+//Returns a Deployment and an error
+func (deploymentManager *DeploymentManager) CreateDeployment(imageDeployment ImageDeployment) (extensions.Deployment, error) {
+	template := constructDeployment(imageDeployment)
+	dep, err := deploymentManager.client.Deployments(imageDeployment.repo).Create(&template)
+	if err != nil {
+		return *dep, err //TODO: Better error handling
+	}
+	return *dep, err
+}
+
+//CreateReplicationController <description goes here>
+//Returns a ReplicationController and an error
+func (deploymentManager *DeploymentManager) CreateReplicationController(imageDeployment ImageDeployment) (api.ReplicationController, error) {
+	template := ConstructReplicationController(imageDeployment)
+	rcResult, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Create(&template)
+	if err != nil {
+		return *rcResult, err //TODO: Better error handling
+	}
+	return *rcResult, nil
+}
+
+//UpdateReplicationController <description goes here>
+//Returns a ReplicationController and an error
+func (deploymentManager *DeploymentManager) UpdateReplicationController(imageDeployment ImageDeployment) (api.ReplicationController, error) {
+	template := ConstructReplicationController(imageDeployment)
+	rcResult, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Update(&template)
+	if err != nil {
+		return *rcResult, err //TODO: Better error handling
+	}
+
+	return *rcResult, nil
+}
+
+//DeleteReplicationController <description goes here>
+//Returns an error
+//Delete will only remove a single ReplicationController
+func (deploymentManager *DeploymentManager) DeleteReplicationController(imageDeployment ImageDeployment) error {
+	err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Delete(imageDeployment.application)
+	if err != nil {
+		return err //TODO: Better error handling
+	}
+	return nil
+}
+
+//GetReplicationController <description goes here>
+//Returns a ReplicationController and an error
+func (deploymentManager *DeploymentManager) GetReplicationController(imageDeployment ImageDeployment) (api.ReplicationController, error) {
+	rc, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).Get(imageDeployment.application)
+	if err != nil {
+		return *rc, err //TODO: Better error handling
+	}
+	return *rc, err
+}
+
+//ListReplicationControllers <description goes here>
+//Returns a ReplicationControllerList and an error
+//TODO: Should only be passing in label selectors
+func (deploymentManager *DeploymentManager) ListReplicationControllers(imageDeployment ImageDeployment) (*api.ReplicationControllerList, error) {
+	//TODO: If one option isn't passed in then set it to all or none
+	//Need labels to be exclusive, fewer labels == more results
+	selector, err := labels.Parse("repo=" + imageDeployment.repo + "," +
+		"application=" + imageDeployment.application + "," +
+		"revision=" + imageDeployment.revision)
+	if err != nil {
+		return nil, err //TODO: Better error handling
+	}
+
+	options := api.ListOptions{
+		LabelSelector: selector,
+	}
+
+	controllers, err := deploymentManager.client.ReplicationControllers(imageDeployment.repo).List(options)
+	if err != nil {
+		return nil, err //TODO: Better error handling
+	}
+
+	return controllers, nil
+}
+
 //ConstructReplicationController creates a replication controller object from the passed arguments and default rc template
 func ConstructReplicationController(imageDeployment ImageDeployment) api.ReplicationController {
 	rcTemplate := api.ReplicationController{
@@ -154,11 +229,12 @@ func ConstructReplicationController(imageDeployment ImageDeployment) api.Replica
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: imageDeployment.podCount, //Takes imageDeployment.podCount
-			Selector: map[string]string{ //ReplicationController Labels go here
-				"repo":        imageDeployment.repo,
-				"application": imageDeployment.application,
-				"revision":    imageDeployment.revision,
-			},
+			/*
+				Selector: map[string]string{ //ReplicationController Labels go here
+					"repo":        imageDeployment.repo,
+					"application": imageDeployment.application,
+					"revision":    imageDeployment.revision,
+				},*/
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
