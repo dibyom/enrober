@@ -1,16 +1,20 @@
-package enrober
+package wrap
 
 import (
 	"fmt"
 	"testing"
-)
 
-import "github.com/stretchr/testify/assert"
-import "k8s.io/kubernetes/pkg/client/restclient"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/client/restclient"
+)
 
 //Global Variables
 var config = restclient.Config{
 	Host: "127.0.0.1:8080",
+}
+
+var config2 = restclient.Config{
+	Host: "",
 }
 
 var imageDeployment = ImageDeployment{
@@ -29,6 +33,14 @@ func TestCreateDeploymentManager(t *testing.T) {
 	assert.Nil(t, err)
 
 	//TODO: Better assertion
+	assert.NotEmpty(t, deploymentManager)
+}
+
+//Testing CreateDeploymentManager with empty config
+func TestCreateInDeployment(t *testing.T) {
+	deploymentManager, err := CreateDeploymentManager(config2)
+	assert.Nil(t, err)
+
 	assert.NotEmpty(t, deploymentManager)
 }
 

@@ -1,9 +1,13 @@
 package: github.com/30x/enrober
 import:
 - package: k8s.io/kubernetes
-  vcs: git
   version: 1.2.0
   subpackages:
   - pkg/client/unversioned
   - pkg/client/api
 - package: github.com/stretchr/testify
+- package: github.com/gorilla/mux
+- package: github.com/opencontainers/runc
+  subpackages:
+  - libcontainer
+- package: github.com/docker/go-units
