@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/30x/enrober/wrap"
 	"github.com/gorilla/mux"
@@ -13,11 +15,13 @@ import (
 func main() {
 	router := mux.NewRouter().StrictSlash(true)
 
-	router.HandleFunc("/{repo}", RepoHandler).Methods("GET")
+	sub := router.PathPrefix("/deploy").Subrouter()
 
-	router.HandleFunc("/{repo}/{application}", ApplicationHandler).Methods("GET")
+	sub.HandleFunc("/{repo}", RepoHandler).Methods("GET")
 
-	router.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT")
+	sub.HandleFunc("/{repo}/{application}", ApplicationHandler).Methods("GET")
+
+	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT")
 
 	http.ListenAndServe(":8080", router)
 }
@@ -36,13 +40,16 @@ func RepoHandler(w http.ResponseWriter, r *http.Request) {
 	//blank config so it shold use InClusterConfig
 	//TODO: Should have a way to pass client in externally
 	clientconfig := restclient.Config{
-		Host: "127.0.0.1:8080",
+		//Local Testing
+		// Host: "127.0.0.1:8080",
+		//In Cluster Testing
+		Host: "",
 	}
 
 	//manager
 	dm, err := wrap.CreateDeploymentManager(clientconfig)
 	if err != nil {
-		fmt.Fprintf(w, "Shit broke at manager: %v\n", err)
+		fmt.Fprintf(w, "Broke at manager: %v\n", err)
 		fmt.Fprintf(w, "In function RepoHandler\n")
 		return
 	}
@@ -64,7 +71,7 @@ func RepoHandler(w http.ResponseWriter, r *http.Request) {
 
 		ns, err := dm.GetNamespace(imagedeployment)
 		if err != nil {
-			fmt.Fprintf(w, "Shit broke at namespace: %v\n", err)
+			fmt.Fprintf(w, "Broke at namespace: %v\n", err)
 			fmt.Fprintf(w, "In function RepoHandler\n")
 			return
 		}
@@ -72,7 +79,7 @@ func RepoHandler(w http.ResponseWriter, r *http.Request) {
 
 		depList, err := dm.GetDeploymentList(imagedeployment)
 		if err != nil {
-			fmt.Fprintf(w, "Shit broke at deployment: %v\n", err)
+			fmt.Fprintf(w, "Broke at deployment: %v\n", err)
 			fmt.Fprintf(w, "In function ApplicationHandler\n")
 			return
 		}
@@ -96,7 +103,8 @@ func ApplicationHandler(w http.ResponseWriter, r *http.Request) {
 	//blank config so it shold use InClusterConfig
 	//TODO: Should have a way to pass client in externally
 	clientconfig := restclient.Config{
-		Host: "127.0.0.1:8080",
+		// Host: "127.0.0.1:8080",
+		Host: "",
 	}
 
 	//get namespace matching vars["repo"]
@@ -113,7 +121,7 @@ func ApplicationHandler(w http.ResponseWriter, r *http.Request) {
 	//manager
 	dm, err := wrap.CreateDeploymentManager(clientconfig)
 	if err != nil {
-		fmt.Fprintf(w, "Shit broke at manager: %v\n", err)
+		fmt.Fprintf(w, "Broke at manager: %v\n", err)
 		fmt.Fprintf(w, "In function ApplicationHandler\n")
 		return
 	}
@@ -124,7 +132,7 @@ func ApplicationHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		depList, err := dm.GetDeploymentList(imagedeployment)
 		if err != nil {
-			fmt.Fprintf(w, "Shit broke at deployment: %v\n", err)
+			fmt.Fprintf(w, "Broke at deployment: %v\n", err)
 			fmt.Fprintf(w, "In function ApplicationHandler\n")
 			return
 		}
@@ -147,7 +155,8 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 	//blank config so it shold use InClusterConfig
 	//TODO: Should have a way to pass client in externally
 	clientconfig := restclient.Config{
-		Host: "127.0.0.1:8080",
+		// Host: "127.0.0.1:8080",
+		Host: "",
 	}
 
 	imagedeployment := wrap.ImageDeployment{
@@ -163,7 +172,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 	//manager
 	dm, err := wrap.CreateDeploymentManager(clientconfig)
 	if err != nil {
-		fmt.Fprintf(w, "Shit broke at manager: %v\n", err)
+		fmt.Fprintf(w, "Broke at manager: %v\n", err)
 		fmt.Fprintf(w, "In function RevisionHandler\n")
 		return
 	}
@@ -174,7 +183,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		dep, err := dm.GetDeployment(imagedeployment)
 		if err != nil {
-			fmt.Fprintf(w, "Shit broke at deployment: %v\n", err)
+			fmt.Fprintf(w, "Broke at deployment: %v\n", err)
 			fmt.Fprintf(w, "In function RevisionHandler\n")
 			return
 		}
@@ -185,26 +194,45 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		getNs, err := dm.GetNamespace(imagedeployment)
 
 		//Namespace wasn't found so create it
-		//TODO: Want to double check the &&
 		if err != nil && getNs.GetName() == "" {
 			ns, err := dm.CreateNamespace(imagedeployment)
 			if err != nil {
-				fmt.Fprintf(w, "Shit broke at namespace: %v\n", err)
+				fmt.Fprintf(w, "Broke at namespace: %v\n", err)
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
 			fmt.Fprintf(w, "Put Namespace %s\n", ns.GetName())
 		}
 
+		type deploymentVariables struct {
+			PodCount     int
+			TrafficHosts []string
+			PublicPaths  []string
+			PublicPort   int
+		}
+		//TODO Probably a horrifying amount of input validation
+		decoder := json.NewDecoder(r.Body)
+		var t deploymentVariables
+		err = decoder.Decode(&t)
+
+		//TODO: If they don't give a pod count set to 1
+		if t.PodCount != 0 {
+			imagedeployment.PodCount = t.PodCount
+		} else {
+			imagedeployment.PodCount = 1
+		}
+		imagedeployment.TrafficHosts = t.TrafficHosts
+		imagedeployment.PublicPaths = t.PublicPaths
+		imagedeployment.PublicPort = strconv.Itoa(t.PublicPort)
+
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)
 
 		//Deployment wasn't found so create it
-		//TODO: Want to double check the &&
 		if err != nil && getDep.GetName() == "" {
 			dep, err := dm.CreateDeployment(imagedeployment)
 			if err != nil {
-				fmt.Fprintf(w, "Shit broke at deployment: %v\n", err)
+				fmt.Fprintf(w, "Broke at deployment: %v\n", err)
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
@@ -213,7 +241,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 			//Deployment was found so modify it
 			dep, err := dm.UpdateDeployment(imagedeployment)
 			if err != nil {
-				fmt.Fprintf(w, "Shit broke at deployment: %v\n", err)
+				fmt.Fprintf(w, "Broke at deployment: %v\n", err)
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
