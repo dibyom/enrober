@@ -28,7 +28,7 @@ type ImageDeployment struct {
 	Revision     string
 	TrafficHosts []string
 	PublicPaths  []string
-	PublicPort   string
+	PathPort     string
 	PodCount     int
 }
 
@@ -140,7 +140,6 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
-						//TODO: Are these at the Pod or Deployment Level?
 						"Repo":         imageDeployment.Repo,
 						"Application":  imageDeployment.Application,
 						"Revision":     imageDeployment.Revision,
@@ -150,13 +149,14 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 						//TODO: Make Optional
 						"trafficHosts": trafficHosts,
 						"publicPaths":  publicPaths,
-						"publicPort":   imageDeployment.PublicPort,
+						"pathPort":     "9000", //MAGIC NUMBERS
+						// "pathPort":     imageDeployment.PathPort,
 					},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						api.Container{
-							Name: "test1",
+							Name: imageDeployment.Application + "-" + imageDeployment.Revision,
 							//TODO: How would we get default images?
 							Image: imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision,
 							//ReadinessProbe goes here

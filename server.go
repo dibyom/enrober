@@ -13,9 +13,9 @@ import (
 )
 
 func main() {
-	router := mux.NewRouter().StrictSlash(true)
+	router := mux.NewRouter()
 
-	sub := router.PathPrefix("/deploy").Subrouter()
+	sub := router.PathPrefix("/beeswax/deploy/api/v1").Subrouter()
 
 	sub.HandleFunc("/{repo}", RepoHandler).Methods("GET")
 
@@ -23,7 +23,7 @@ func main() {
 
 	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT")
 
-	http.ListenAndServe(":8080", router)
+	http.ListenAndServe(":9000", router)
 }
 
 //RepoHandler does stuff
@@ -60,7 +60,7 @@ func RepoHandler(w http.ResponseWriter, r *http.Request) {
 		Revision:     "",
 		TrafficHosts: []string{},
 		PublicPaths:  []string{},
-		PublicPort:   "",
+		PathPort:     "",
 		PodCount:     0,
 	}
 
@@ -114,7 +114,7 @@ func ApplicationHandler(w http.ResponseWriter, r *http.Request) {
 		Revision:     "",
 		TrafficHosts: []string{},
 		PublicPaths:  []string{},
-		PublicPort:   "",
+		PathPort:     "",
 		PodCount:     0,
 	}
 
@@ -165,7 +165,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		Revision:     vars["revision"],
 		TrafficHosts: []string{},
 		PublicPaths:  []string{},
-		PublicPort:   "",
+		PathPort:     "",
 		PodCount:     1,
 	}
 
@@ -205,25 +205,31 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		type deploymentVariables struct {
-			PodCount     int
-			TrafficHosts []string
-			PublicPaths  []string
-			PublicPort   int
+			PodCount     int      `json:"podCount"`
+			TrafficHosts []string `json:"trafficHosts"`
+			PublicPaths  []string `json:"publicPaths"`
+			PathPort     int      `json:"pathPort"`
 		}
-		//TODO Probably a horrifying amount of input validation
+		//TODO: Probably a horrifying amount of input validation
 		decoder := json.NewDecoder(r.Body)
 		var t deploymentVariables
 		err = decoder.Decode(&t)
 
-		//TODO: If they don't give a pod count set to 1
 		if t.PodCount != 0 {
 			imagedeployment.PodCount = t.PodCount
 		} else {
 			imagedeployment.PodCount = 1
 		}
+
+		//TrafficHosts can't be empty so fail if it is
+		if t.TrafficHosts[0] == "" {
+			fmt.Fprintf(w, "Traffic Hosts cannot be empty")
+			return
+		}
 		imagedeployment.TrafficHosts = t.TrafficHosts
+
 		imagedeployment.PublicPaths = t.PublicPaths
-		imagedeployment.PublicPort = strconv.Itoa(t.PublicPort)
+		imagedeployment.PathPort = strconv.Itoa(t.PathPort)
 
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)

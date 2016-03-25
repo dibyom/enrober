@@ -17,13 +17,13 @@ spec:
       annotations:
         trafficHosts: "test.k8s.local"
         publicPaths: "/"
-        pathPort: "8080"
+        pathPort: "9000"
     spec:
       containers:
       - name: enrober
         image: jbowen/enrober:v0
         env:
           - name: PORT
-            value: "8080"
+            value: "9000"
         ports:
-          - containerPort: 8080
+          - containerPort: 9000
