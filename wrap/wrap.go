@@ -7,6 +7,7 @@
 package wrap
 
 import (
+	"os"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -132,6 +133,14 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		return extensions.Deployment{}
 	}
 
+	reg := os.Getenv("DOCKER_REGISTRY_URL")
+	regString := ""
+	if reg != "" {
+		regString = reg + "/"
+	} else {
+		regString = ""
+	}
+
 	depTemplate := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: imageDeployment.Application + "-" + imageDeployment.Revision, //May take variable
@@ -165,8 +174,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 						api.Container{
 							Name: imageDeployment.Application + "-" + imageDeployment.Revision,
 							//TODO: How would we get default images?
-							Image: imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision,
-
+							Image: regString + imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision,
 							Env: []api.EnvVar{
 								api.EnvVar{
 									Name:  "PORT",
