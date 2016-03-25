@@ -16,7 +16,7 @@ spec:
         microservice: "true"
       annotations:
         trafficHosts: "test.k8s.local"
-        publicPaths: "/"
+        publicPaths: "/beeswax/deploy"
         pathPort: "9000"
     spec:
       containers:

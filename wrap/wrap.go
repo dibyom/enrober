@@ -7,6 +7,8 @@
 package wrap
 
 import (
+	"strconv"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -124,6 +126,12 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		}
 	}
 
+	//TODO: Handle this error down the line
+	intPathPort, err := strconv.Atoi(imageDeployment.PathPort)
+	if err != nil {
+		return extensions.Deployment{}
+	}
+
 	depTemplate := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: imageDeployment.Application + "-" + imageDeployment.Revision, //May take variable
@@ -149,8 +157,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 						//TODO: Make Optional
 						"trafficHosts": trafficHosts,
 						"publicPaths":  publicPaths,
-						"pathPort":     "9000", //MAGIC NUMBERS
-						// "pathPort":     imageDeployment.PathPort,
+						"pathPort":     imageDeployment.PathPort,
 					},
 				},
 				Spec: api.PodSpec{
@@ -159,6 +166,18 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 							Name: imageDeployment.Application + "-" + imageDeployment.Revision,
 							//TODO: How would we get default images?
 							Image: imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision,
+
+							Env: []api.EnvVar{
+								api.EnvVar{
+									Name:  "PORT",
+									Value: imageDeployment.PathPort,
+								},
+							},
+							Ports: []api.ContainerPort{
+								api.ContainerPort{
+									ContainerPort: intPathPort,
+								},
+							},
 							//ReadinessProbe goes here
 							//TODO: Implementation details
 							/*
