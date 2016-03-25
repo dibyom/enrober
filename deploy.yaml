@@ -1,0 +1,29 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: enrober
+  labels:
+    name: enrober
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: enrober
+  template:
+    metadata:
+      labels:
+        name: enrober
+        microservice: "true"
+      annotations:
+        trafficHosts: "test.k8s.local"
+        publicPaths: "/beeswax/deploy"
+        pathPort: "9000"
+    spec:
+      containers:
+      - name: enrober
+        image: jbowen/enrober:v0
+        env:
+          - name: PORT
+            value: "9000"
+        ports:
+          - containerPort: 9000
