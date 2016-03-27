@@ -12,3 +12,6 @@ push-to-hub:
 
 deploy-to-kube:
 	kubectl run enrober --image=localhost:5000/enrober:latest
+	
+deploy-to-aws:
+	kubectl run enrober --image=jbowen/enrober:v0
