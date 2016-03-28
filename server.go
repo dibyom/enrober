@@ -1,3 +1,5 @@
+//TODO: Implement proper HTTP response codes
+
 package main
 
 import (
@@ -26,6 +28,14 @@ func main() {
 	http.ListenAndServe(":9000", router)
 }
 
+//TODO: Maybe use a config file?
+//Global Variables
+var clientconfig = restclient.Config{
+	Host: "127.0.0.1:8080", //Local Testing
+
+	// Host: "", //In Cluster Testing
+}
+
 //RepoHandler does stuff
 func RepoHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -36,15 +46,6 @@ func RepoHandler(w http.ResponseWriter, r *http.Request) {
 	//get the http verb
 	verb := r.Method
 	fmt.Fprintf(w, "HTTP Verb: %s\n", verb)
-
-	//blank config so it shold use InClusterConfig
-	//TODO: Should have a way to pass client in externally
-	clientconfig := restclient.Config{
-		//Local Testing
-		// Host: "127.0.0.1:8080",
-		//In Cluster Testing
-		Host: "",
-	}
 
 	//manager
 	dm, err := wrap.CreateDeploymentManager(clientconfig)
@@ -100,13 +101,6 @@ func ApplicationHandler(w http.ResponseWriter, r *http.Request) {
 	verb := r.Method
 	fmt.Fprintf(w, "HTTP Verb: %s\n", verb)
 
-	//blank config so it shold use InClusterConfig
-	//TODO: Should have a way to pass client in externally
-	clientconfig := restclient.Config{
-		// Host: "127.0.0.1:8080",
-		Host: "",
-	}
-
 	//get namespace matching vars["repo"]
 	imagedeployment := wrap.ImageDeployment{
 		Repo:         vars["repo"],
@@ -151,13 +145,6 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 	//get the http verb
 	verb := r.Method
 	fmt.Fprintf(w, "HTTP Verb: %s\n", verb)
-
-	//blank config so it shold use InClusterConfig
-	//TODO: Should have a way to pass client in externally
-	clientconfig := restclient.Config{
-		// Host: "127.0.0.1:8080",
-		Host: "",
-	}
 
 	imagedeployment := wrap.ImageDeployment{
 		Repo:         vars["repo"],
@@ -204,17 +191,20 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "Put Namespace %s\n", ns.GetName())
 		}
 
+		//TODO: Possibly put types somewhere else
 		type deploymentVariables struct {
 			PodCount     int      `json:"podCount"`
 			TrafficHosts []string `json:"trafficHosts"`
 			PublicPaths  []string `json:"publicPaths"`
 			PathPort     int      `json:"pathPort"`
 		}
+
 		//TODO: Probably a horrifying amount of input validation
 		decoder := json.NewDecoder(r.Body)
 		var t deploymentVariables
 		err = decoder.Decode(&t)
 
+		//TODO: Probably don't want this
 		if t.PodCount != 0 {
 			imagedeployment.PodCount = t.PodCount
 		} else {
@@ -222,6 +212,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//TrafficHosts can't be empty so fail if it is
+		//TODO: Should do this checking before we create the namespace
 		if t.TrafficHosts[0] == "" {
 			fmt.Fprintf(w, "Traffic Hosts cannot be empty")
 			return
@@ -236,6 +227,9 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 
 		//Deployment wasn't found so create it
 		if err != nil && getDep.GetName() == "" {
+
+			//TODO: Should create a secret here?
+
 			dep, err := dm.CreateDeployment(imagedeployment)
 			if err != nil {
 				fmt.Fprintf(w, "Broke at deployment: %v\n", err)
