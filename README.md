@@ -1,5 +1,8 @@
 #enrober
 
+>###There is little to no input validation on the json.
+>###Garbage in, Garbage out
+
 This project consists of a wrapper library around the kubernetes client api as well as an API server that exposes said library. The server can be deployed both locally and as a docker container. 
 
 ###Local Deployment
@@ -51,10 +54,17 @@ A `json` body with a corresponding header of `Content-Type: application/json` is
 
 ```
 {
-	"PodCount": 		Int,  		//Optional defaults to 1
-	"TrafficHosts": 	[string],	//Required
-	"PublicPaths":  	[string],	//Required 
-	"PathPort": 		Int			//Required
+	"PodCount": 			Int,  				//Required 
+	"Image":				string, 			//Optional (for now)
+	"ImagePullSecret":		string				//Optional
+	"TrafficHosts": 		[string],			//Required
+	"PublicPaths":  		[string],			//Required 
+	"PathPort": 			Int	,				//Required
+	"EnvVars": { 			string: string,		//Optional
+	    
+	    ...,
+	    ...
+	}
 }
 ```
 
@@ -81,6 +91,8 @@ curl localhost:9000/beeswax/deploy/api/v1/{repo}/{application}/{revision}
 ```
 
 Create a deployment in the given repo, with the given application name and revision tag. If a namespace matching the given repo doesn't exist it will be created. 
+
+>Doesn't cover all options, only required ones.
 
 ```sh
 curl -X PUT -H "Content-Type: application/json" -d '{"PodCount": 1, "TrafficHosts": ["test.k8s.local"], "PublicPaths": ["/app"], "PathPort": 9000}' "http://localhost:9000/beeswax/deploy/api/v1/{repo}/{application}/{revision}"

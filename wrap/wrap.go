@@ -23,16 +23,20 @@ type DeploymentManager struct {
 	client *k8sClient.Client
 }
 
+//TODO: May have to add a secret name here?
 //ImageDeployment is a collection of necesarry resources for Replication Controller Deployments
 type ImageDeployment struct {
 	//RepositoryURI string
-	Repo         string
-	Application  string
-	Revision     string
-	TrafficHosts []string
-	PublicPaths  []string
-	PathPort     string
-	PodCount     int
+	Repo            string
+	Application     string
+	Revision        string
+	TrafficHosts    []string
+	PublicPaths     []string
+	PathPort        string
+	PodCount        int
+	Image           string
+	ImagePullSecret string
+	EnvVars         map[string]string //Quickly added
 }
 
 //CreateDeploymentManager creates an instance of the DeploymentManager from the config passed in, and returns the instance
@@ -81,7 +85,7 @@ func (deploymentManager *DeploymentManager) CreateNamespace(imageDeployment Imag
 	if err != nil {
 		return *ns, err //TODO: Better error handling
 	}
-	return *ns, err
+	return *ns, nil
 }
 
 //GetNamespace <description goes here>
@@ -91,7 +95,7 @@ func (deploymentManager *DeploymentManager) GetNamespace(imageDeployment ImageDe
 	if err != nil {
 		return *ns, err //TODO: Better error handling
 	}
-	return *ns, err
+	return *ns, nil
 }
 
 //DeleteNamespace <description goes here>
@@ -133,12 +137,46 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		return extensions.Deployment{}
 	}
 
+	//TODO: Maybe dont use this?
 	reg := os.Getenv("DOCKER_REGISTRY_URL")
 	regString := ""
 	if reg != "" {
 		regString = reg + "/"
 	} else {
 		regString = ""
+	}
+
+	//Need to make sure the EnvVars map[string]string into a []api.EnvVar
+	//TODO: This may be really fucking stupid
+	var keys []string
+	var values []string
+	for k, v := range imageDeployment.EnvVars {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	envVarTemp := make([]api.EnvVar, len(keys))
+
+	for index, value := range keys {
+		envVarTemp[index].Name = value
+	}
+	for index, value := range values {
+		envVarTemp[index].Value = value
+	}
+
+	portEnvVar := api.EnvVar{
+		Name:  "PORT",
+		Value: imageDeployment.PathPort,
+	}
+	envVarFinal := append(envVarTemp, portEnvVar)
+
+	//TODO: Do we want this
+	var imageTemp string
+	// fmt.Printf("Image String: %v\n", imageDeployment.Image)
+	if imageDeployment.Image == "" { //No passed in Image
+		imageTemp = regString + imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision
+	} else {
+		imageTemp = imageDeployment.Image
 	}
 
 	depTemplate := extensions.Deployment{
@@ -164,23 +202,34 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 					},
 					Annotations: map[string]string{
 						//TODO: Make Optional
-						"trafficHosts": trafficHosts,
-						"publicPaths":  publicPaths,
-						"pathPort":     imageDeployment.PathPort,
+						//TODO: Make sure this is valid calico policy
+						"projectcalico.org/policy": "allow tcp from label Application=" + imageDeployment.Application + " to ports " + imageDeployment.PathPort,
+						"trafficHosts":             trafficHosts,
+						"publicPaths":              publicPaths,
+						"pathPort":                 imageDeployment.PathPort,
 					},
 				},
 				Spec: api.PodSpec{
+					//TODO: Come back to this
+					ImagePullSecrets: []api.LocalObjectReference{
+						api.LocalObjectReference{
+							Name: imageDeployment.ImagePullSecret,
+						},
+					},
 					Containers: []api.Container{
 						api.Container{
 							Name: imageDeployment.Application + "-" + imageDeployment.Revision,
 							//TODO: How would we get default images?
-							Image: regString + imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision,
-							Env: []api.EnvVar{
-								api.EnvVar{
-									Name:  "PORT",
-									Value: imageDeployment.PathPort,
-								},
-							},
+							Image: imageTemp,
+							Env:   envVarFinal,
+							// []api.EnvVar{
+							// 	api.EnvVar{
+							// 		Name:  "PORT",
+							// 		Value: imageDeployment.PathPort,
+							// 	},
+							// 	//TODO: Add support for passed in env var map
+							// 	// for i, v := range imageDeployment
+							// },
 							Ports: []api.ContainerPort{
 								api.ContainerPort{
 									ContainerPort: intPathPort,
@@ -213,7 +262,7 @@ func (deploymentManager *DeploymentManager) GetDeployment(imageDeployment ImageD
 	if err != nil {
 		return *dep, err //TODO: Better error handling
 	}
-	return *dep, err
+	return *dep, nil
 }
 
 //GetDeploymentList <description goes here>
@@ -237,7 +286,7 @@ func (deploymentManager *DeploymentManager) GetDeploymentList(imageDeployment Im
 			return *depList, err //TODO: Better error handling
 		}
 	}
-	return *depList, err
+	return *depList, nil
 }
 
 //CreateDeployment <description goes here>
@@ -248,7 +297,7 @@ func (deploymentManager *DeploymentManager) CreateDeployment(imageDeployment Ima
 	if err != nil {
 		return *dep, err //TODO: Better error handling
 	}
-	return *dep, err
+	return *dep, nil
 }
 
 //UpdateDeployment <description goes here>
@@ -258,5 +307,27 @@ func (deploymentManager *DeploymentManager) UpdateDeployment(imageDeployment Ima
 	if err != nil {
 		return *dep, err //TODO: Better error handling
 	}
-	return *dep, err
+	return *dep, nil
 }
+
+// //ConstructSecret <description goes here>
+// func (deploymentManager *DeploymentManager) ConstructSecret(name string) (api.Secret, error) {
+// 	secretTemplate := api.Secret{
+// 		ObjectMeta: api.ObjectMeta{
+// 			Name: name,
+// 		},
+// 		Data: map[string][]byte{},
+// 		Type: "Opaque",
+// 	}
+// 	return secretTemplate, nil
+// }
+
+// //CreateSecret <description goes here>
+// func (deploymentManager *DeploymentManager) CreateSecret(imageDeployment ImageDeployment) (api.Secret, error) {
+// 	template := ConstructSecret() //TODO
+// 	secret, err := deploymentManager.client.Secrets(imageDeployment.Repo).Create(&template)
+// 	if err != nil {
+// 		return *dep, err //TODO: Better error handling
+// 	}
+// 	return *dep, nil
+// }

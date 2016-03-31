@@ -154,6 +154,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		PublicPaths:  []string{},
 		PathPort:     "",
 		PodCount:     1,
+		EnvVars:      map[string]string{},
 	}
 
 	//manager
@@ -192,24 +193,21 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//TODO: Possibly put types somewhere else
+		//Where I'm putting the JSON body
 		type deploymentVariables struct {
-			PodCount     int      `json:"podCount"`
-			TrafficHosts []string `json:"trafficHosts"`
-			PublicPaths  []string `json:"publicPaths"`
-			PathPort     int      `json:"pathPort"`
+			PodCount        int               `json:"podCount"`
+			Image           string            `json:"image"`
+			ImagePullSecret string            `json:"imagePullSecret`
+			TrafficHosts    []string          `json:"trafficHosts"`
+			PublicPaths     []string          `json:"publicPaths"`
+			PathPort        int               `json:"pathPort"`
+			EnvVars         map[string]string `json:"envVars"`
 		}
 
 		//TODO: Probably a horrifying amount of input validation
 		decoder := json.NewDecoder(r.Body)
 		var t deploymentVariables
 		err = decoder.Decode(&t)
-
-		//TODO: Probably don't want this
-		if t.PodCount != 0 {
-			imagedeployment.PodCount = t.PodCount
-		} else {
-			imagedeployment.PodCount = 1
-		}
 
 		//TrafficHosts can't be empty so fail if it is
 		//TODO: Should do this checking before we create the namespace
@@ -221,6 +219,11 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 
 		imagedeployment.PublicPaths = t.PublicPaths
 		imagedeployment.PathPort = strconv.Itoa(t.PathPort)
+
+		//Make sure this works
+		imagedeployment.EnvVars = t.EnvVars
+
+		imagedeployment.Image = t.Image
 
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)

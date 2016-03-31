@@ -24,7 +24,7 @@ var imageDeployment = ImageDeployment{
 	Revision:     "v0",
 	TrafficHosts: []string{},
 	PublicPaths:  []string{},
-	PublicPort:   "",
+	PathPort:     "",
 	PodCount:     1,
 }
 
@@ -107,3 +107,5 @@ func TestCreateDeployment(t *testing.T) {
 
 	fmt.Println(dep)
 }
+
+//TODO: More Deployment testing and probably an E2E test.
