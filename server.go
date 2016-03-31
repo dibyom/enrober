@@ -31,9 +31,9 @@ func main() {
 //TODO: Maybe use a config file?
 //Global Variables
 var clientconfig = restclient.Config{
-	Host: "127.0.0.1:8080", //Local Testing
+	// Host: "127.0.0.1:8080", //Local Testing
 
-	// Host: "", //In Cluster Testing
+	Host: "", //In Cluster Testing
 }
 
 //RepoHandler does stuff
@@ -155,6 +155,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		PathPort:     "",
 		PodCount:     1,
 		EnvVars:      map[string]string{},
+		Database:     wrap.DBStruct{},
 	}
 
 	//manager
@@ -197,11 +198,12 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		type deploymentVariables struct {
 			PodCount        int               `json:"podCount"`
 			Image           string            `json:"image"`
-			ImagePullSecret string            `json:"imagePullSecret`
+			ImagePullSecret string            `json:"imagePullSecret"`
 			TrafficHosts    []string          `json:"trafficHosts"`
 			PublicPaths     []string          `json:"publicPaths"`
 			PathPort        int               `json:"pathPort"`
 			EnvVars         map[string]string `json:"envVars"`
+			Database        wrap.DBStruct     `json:"database"`
 		}
 
 		//TODO: Probably a horrifying amount of input validation
@@ -224,6 +226,24 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		imagedeployment.EnvVars = t.EnvVars
 
 		imagedeployment.Image = t.Image
+
+		//Parse the Database stuff passed in
+		//Verify that the size is either small, medium, large, huge
+		sizeMap := map[string]struct{}{
+			"small":  {},
+			"medium": {},
+			"large":  {},
+			"huge":   {},
+		}
+		_, ok := sizeMap[t.Database.Size]
+		if ok {
+			fmt.Fprintf(w, "Valid DB Size: %v\n", t.Database.Size)
+		} else {
+			fmt.Fprintf(w, "Invalid DB Size: %v\n", t.Database.Size)
+			return
+		}
+		//TODO: Come back and review this
+		//Database creation stuff or something
 
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)

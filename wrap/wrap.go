@@ -23,10 +23,14 @@ type DeploymentManager struct {
 	client *k8sClient.Client
 }
 
+type DBStruct struct {
+	Name string
+	Size string
+}
+
 //TODO: May have to add a secret name here?
 //ImageDeployment is a collection of necesarry resources for Replication Controller Deployments
 type ImageDeployment struct {
-	//RepositoryURI string
 	Repo            string
 	Application     string
 	Revision        string
@@ -36,7 +40,9 @@ type ImageDeployment struct {
 	PodCount        int
 	Image           string
 	ImagePullSecret string
-	EnvVars         map[string]string //Quickly added
+	EnvVars         map[string]string
+	//Database stuff
+	Database DBStruct //Is this even needed here?
 }
 
 //CreateDeploymentManager creates an instance of the DeploymentManager from the config passed in, and returns the instance
@@ -203,7 +209,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 					Annotations: map[string]string{
 						//TODO: Make Optional
 						//TODO: Make sure this is valid calico policy
-						"projectcalico.org/policy": "allow tcp from label Application=" + imageDeployment.Application + " to ports " + imageDeployment.PathPort,
+						"projectcalico.org/policy": "allow tcp from label Application=" + imageDeployment.Application + " to ports " + imageDeployment.PathPort + "; allow tcp from app=nginx-ingress",
 						"trafficHosts":             trafficHosts,
 						"publicPaths":              publicPaths,
 						"pathPort":                 imageDeployment.PathPort,

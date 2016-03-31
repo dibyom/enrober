@@ -64,6 +64,10 @@ A `json` body with a corresponding header of `Content-Type: application/json` is
 	    
 	    ...,
 	    ...
+	},
+	"Database": {
+		"Name": string,
+		"Size": "small/medium/large/huge"
 	}
 }
 ```
