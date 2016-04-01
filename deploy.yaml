@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: enrober
-        image: jbowen/enrober:v0
+        image: jbowen/enrober:vdemo
         env:
           - name: PORT
             value: "9000"

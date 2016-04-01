@@ -5,8 +5,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/30x/enrober/wrap"
 	"github.com/gorilla/mux"
@@ -23,7 +26,7 @@ func main() {
 
 	sub.HandleFunc("/{repo}/{application}", ApplicationHandler).Methods("GET")
 
-	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT")
+	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT", "POST")
 
 	http.ListenAndServe(":9000", router)
 }
@@ -31,9 +34,9 @@ func main() {
 //TODO: Maybe use a config file?
 //Global Variables
 var clientconfig = restclient.Config{
-	// Host: "127.0.0.1:8080", //Local Testing
+	Host: "127.0.0.1:8080", //Local Testing
 
-	Host: "", //In Cluster Testing
+	// Host: "", //In Cluster Testing
 }
 
 //RepoHandler does stuff
@@ -178,7 +181,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprintf(w, "Got Deployment %v\n", dep.GetName())
 
-	case "PUT":
+	case "PUT", "POST":
 		//Check if namespace already exists
 		getNs, err := dm.GetNamespace(imagedeployment)
 
@@ -242,8 +245,50 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "Invalid DB Size: %v\n", t.Database.Size)
 			return
 		}
+		imagedeployment.Database.Name = t.Database.Name
+		imagedeployment.Database.Size = t.Database.Size
+
 		//TODO: Come back and review this
 		//Database creation stuff or something
+		//Calling terraform binary
+		//Need to create the *.tfvars file based on input
+		pwd, _ := os.Getwd()
+		file, _ := ioutil.ReadFile(pwd + "/rds/postgres_rds.tfvars")
+		fileString := string(file)
+		lines := strings.Split(fileString, "\n")
+
+		for index, line := range lines {
+			if strings.Contains(line, "instance_class") {
+				lines[index] = "instance_class = " + "\"" + imagedeployment.Database.Size + "\""
+			}
+			if strings.Contains(line, "db_name") {
+				lines[index] = "db_name = " + "\"" + imagedeployment.Database.Name + "\""
+			}
+		}
+		finalString := strings.Join(lines, "\n")
+		err = ioutil.WriteFile(pwd+"/rds/postgres_rds.tfvars", []byte(finalString), 0644)
+
+		//Make Commands
+		//TODO: Can't find in $PATH?
+		// fmt.Printf(pwd + "\n")
+		// terraformApply := exec.Command("terraform", "apply", "rds")
+		// err = terraformApply.Start()
+		// if err != nil {
+		// 	fmt.Printf("Terraform Apply Error: %v\n", err)
+		// }
+
+		//Terraform Apply
+
+		//Terraform Output
+		//Store Output into a Docker Env Variables
+
+		// imagedeployment.EnvVars{
+		// 	"DB_HOST":     "",
+		// 	"DB_USER":     "postgres",
+		// 	"DB_PASSWORD": "postgres",
+		// 	"DB_PORT":     "5432",
+		// 	"MODE":        "put",
+		// }
 
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)
@@ -259,7 +304,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
-			fmt.Fprintf(w, "Put Deployment %s\n", dep.GetName())
+			fmt.Fprintf(w, "New Deployment %s\n", dep.GetName())
 		} else {
 			//Deployment was found so modify it
 			dep, err := dm.UpdateDeployment(imagedeployment)
@@ -268,7 +313,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
-			fmt.Fprintf(w, "Put Deployment %s\n", dep.GetName())
+			fmt.Fprintf(w, "Modified Deployment %s\n", dep.GetName())
 		}
 	}
 }

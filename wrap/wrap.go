@@ -7,6 +7,7 @@
 package wrap
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -185,6 +186,8 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		imageTemp = imageDeployment.Image
 	}
 
+	calicoPolicy := "allow tcp from label Application=" + imageDeployment.Application + " to ports " + imageDeployment.PathPort + "; allow tcp from app=nginx-ingress"
+
 	depTemplate := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: imageDeployment.Application + "-" + imageDeployment.Revision, //May take variable
@@ -209,7 +212,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 					Annotations: map[string]string{
 						//TODO: Make Optional
 						//TODO: Make sure this is valid calico policy
-						"projectcalico.org/policy": "allow tcp from label Application=" + imageDeployment.Application + " to ports " + imageDeployment.PathPort + "; allow tcp from app=nginx-ingress",
+						"projectcalico.org/policy": calicoPolicy,
 						"trafficHosts":             trafficHosts,
 						"publicPaths":              publicPaths,
 						"pathPort":                 imageDeployment.PathPort,
@@ -259,6 +262,12 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		},
 		Status: extensions.DeploymentStatus{},
 	}
+	//TODO: Come back
+	//Print annotations to stdout
+	for key, val := range depTemplate.Spec.Template.Annotations {
+		fmt.Printf(key + ": " + val + "\n")
+	}
+	// fmt.Printf("Annotations:\n%v\n", depTemplate.Spec.Template.Annotations)
 	return depTemplate
 }
 
