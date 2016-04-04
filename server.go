@@ -5,11 +5,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/30x/enrober/wrap"
 	"github.com/gorilla/mux"
@@ -17,7 +15,26 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
+//Global Variables
+var clientconfig = restclient.Config{
+	Host: "127.0.0.1:8080", //Default to Local Testing
+}
+
 func main() {
+
+	//Set Config
+	var state = os.Getenv("DEPLOY_STATE")
+	switch state {
+	case "PROD":
+		clientconfig.Host = ""
+	case "DEV":
+		clientconfig.Host = "127.0.0.1:8080"
+	case "E2E":
+		clientconfig.Host = ""
+	default:
+		fmt.Printf("Defaulting to Local Dev Setup\n")
+	}
+
 	router := mux.NewRouter()
 
 	sub := router.PathPrefix("/beeswax/deploy/api/v1").Subrouter()
@@ -29,14 +46,7 @@ func main() {
 	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT", "POST")
 
 	http.ListenAndServe(":9000", router)
-}
 
-//TODO: Maybe use a config file?
-//Global Variables
-var clientconfig = restclient.Config{
-	Host: "127.0.0.1:8080", //Local Testing
-
-	// Host: "", //In Cluster Testing
 }
 
 //RepoHandler does stuff
@@ -158,7 +168,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		PathPort:     "",
 		PodCount:     1,
 		EnvVars:      map[string]string{},
-		Database:     wrap.DBStruct{},
+		// Database:     wrap.DBStruct{},
 	}
 
 	//manager
@@ -206,7 +216,6 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 			PublicPaths     []string          `json:"publicPaths"`
 			PathPort        int               `json:"pathPort"`
 			EnvVars         map[string]string `json:"envVars"`
-			Database        wrap.DBStruct     `json:"database"`
 		}
 
 		//TODO: Probably a horrifying amount of input validation
@@ -229,66 +238,6 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		imagedeployment.EnvVars = t.EnvVars
 
 		imagedeployment.Image = t.Image
-
-		//Parse the Database stuff passed in
-		//Verify that the size is either small, medium, large, huge
-		sizeMap := map[string]struct{}{
-			"small":  {},
-			"medium": {},
-			"large":  {},
-			"huge":   {},
-		}
-		_, ok := sizeMap[t.Database.Size]
-		if ok {
-			fmt.Fprintf(w, "Valid DB Size: %v\n", t.Database.Size)
-		} else {
-			fmt.Fprintf(w, "Invalid DB Size: %v\n", t.Database.Size)
-			return
-		}
-		imagedeployment.Database.Name = t.Database.Name
-		imagedeployment.Database.Size = t.Database.Size
-
-		//TODO: Come back and review this
-		//Database creation stuff or something
-		//Calling terraform binary
-		//Need to create the *.tfvars file based on input
-		pwd, _ := os.Getwd()
-		file, _ := ioutil.ReadFile(pwd + "/rds/postgres_rds.tfvars")
-		fileString := string(file)
-		lines := strings.Split(fileString, "\n")
-
-		for index, line := range lines {
-			if strings.Contains(line, "instance_class") {
-				lines[index] = "instance_class = " + "\"" + imagedeployment.Database.Size + "\""
-			}
-			if strings.Contains(line, "db_name") {
-				lines[index] = "db_name = " + "\"" + imagedeployment.Database.Name + "\""
-			}
-		}
-		finalString := strings.Join(lines, "\n")
-		err = ioutil.WriteFile(pwd+"/rds/postgres_rds.tfvars", []byte(finalString), 0644)
-
-		//Make Commands
-		//TODO: Can't find in $PATH?
-		// fmt.Printf(pwd + "\n")
-		// terraformApply := exec.Command("terraform", "apply", "rds")
-		// err = terraformApply.Start()
-		// if err != nil {
-		// 	fmt.Printf("Terraform Apply Error: %v\n", err)
-		// }
-
-		//Terraform Apply
-
-		//Terraform Output
-		//Store Output into a Docker Env Variables
-
-		// imagedeployment.EnvVars{
-		// 	"DB_HOST":     "",
-		// 	"DB_USER":     "postgres",
-		// 	"DB_PASSWORD": "postgres",
-		// 	"DB_PORT":     "5432",
-		// 	"MODE":        "put",
-		// }
 
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)

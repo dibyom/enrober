@@ -1,5 +1,3 @@
-//Top Level TODOs go here
-
 //TODO: Decide on better naming scheme
 //TODO: Make sure all functions have proper description
 //TODO: Make sure all functions have proper error handling
@@ -24,13 +22,8 @@ type DeploymentManager struct {
 	client *k8sClient.Client
 }
 
-type DBStruct struct {
-	Name string
-	Size string
-}
-
-//TODO: May have to add a secret name here?
 //ImageDeployment is a collection of necesarry resources for Replication Controller Deployments
+//TODO: May have to add a secret name here?
 type ImageDeployment struct {
 	Repo            string
 	Application     string
@@ -42,8 +35,6 @@ type ImageDeployment struct {
 	Image           string
 	ImagePullSecret string
 	EnvVars         map[string]string
-	//Database stuff
-	Database DBStruct //Is this even needed here?
 }
 
 //CreateDeploymentManager creates an instance of the DeploymentManager from the config passed in, and returns the instance
@@ -145,6 +136,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 	}
 
 	//TODO: Maybe dont use this?
+	//TODO: Is this deprecated by passing image in the body?
 	reg := os.Getenv("DOCKER_REGISTRY_URL")
 	regString := ""
 	if reg != "" {
@@ -154,7 +146,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 	}
 
 	//Need to make sure the EnvVars map[string]string into a []api.EnvVar
-	//TODO: This may be really fucking stupid
+	//TODO: This may be really fucking stupid, review
 	var keys []string
 	var values []string
 	for k, v := range imageDeployment.EnvVars {
@@ -179,8 +171,8 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 
 	//TODO: Do we want this
 	var imageTemp string
-	// fmt.Printf("Image String: %v\n", imageDeployment.Image)
-	if imageDeployment.Image == "" { //No passed in Image
+	//If no Image is passed in then concatenate path
+	if imageDeployment.Image == "" {
 		imageTemp = regString + imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision
 	} else {
 		imageTemp = imageDeployment.Image
@@ -210,8 +202,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 						"microservice": "true",
 					},
 					Annotations: map[string]string{
-						//TODO: Make Optional
-						//TODO: Make sure this is valid calico policy
+						//TODO: Should we make this optional?
 						"projectcalico.org/policy": calicoPolicy,
 						"trafficHosts":             trafficHosts,
 						"publicPaths":              publicPaths,
@@ -219,7 +210,7 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 					},
 				},
 				Spec: api.PodSpec{
-					//TODO: Come back to this
+					//TODO: Ensure that this works
 					ImagePullSecrets: []api.LocalObjectReference{
 						api.LocalObjectReference{
 							Name: imageDeployment.ImagePullSecret,
@@ -227,25 +218,16 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 					},
 					Containers: []api.Container{
 						api.Container{
-							Name: imageDeployment.Application + "-" + imageDeployment.Revision,
-							//TODO: How would we get default images?
+							Name:  imageDeployment.Application + "-" + imageDeployment.Revision,
 							Image: imageTemp,
 							Env:   envVarFinal,
-							// []api.EnvVar{
-							// 	api.EnvVar{
-							// 		Name:  "PORT",
-							// 		Value: imageDeployment.PathPort,
-							// 	},
-							// 	//TODO: Add support for passed in env var map
-							// 	// for i, v := range imageDeployment
-							// },
 							Ports: []api.ContainerPort{
 								api.ContainerPort{
 									ContainerPort: intPathPort,
 								},
 							},
 							//ReadinessProbe goes here
-							//TODO: Implementation details
+							//TODO: Should we be implementing this? If so how?
 							/*
 								ReadinessProbe: &api.Probe{
 									Handler: api.Handler{
@@ -262,12 +244,10 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		},
 		Status: extensions.DeploymentStatus{},
 	}
-	//TODO: Come back
-	//Print annotations to stdout
+	//TODO: Do we want this in final implementation?
 	for key, val := range depTemplate.Spec.Template.Annotations {
-		fmt.Printf(key + ": " + val + "\n")
+		fmt.Printf(key + ": " + val + "\n") //Print annotations to stdout
 	}
-	// fmt.Printf("Annotations:\n%v\n", depTemplate.Spec.Template.Annotations)
 	return depTemplate
 }
 

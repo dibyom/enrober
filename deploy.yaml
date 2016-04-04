@@ -21,9 +21,11 @@ spec:
     spec:
       containers:
       - name: enrober
-        image: jbowen/enrober:vdemo
+        image: jbowen/enrober:v0
         env:
           - name: PORT
             value: "9000"
+          - name: DEPLOY_STATE
+            value: "PROD"
         ports:
           - containerPort: 9000
