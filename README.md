@@ -1,7 +1,6 @@
 #enrober
 
->###There is little to no input validation on the json.
->###Garbage in, Garbage out
+>###Warning: There is currently minimal input validation on the json.
 
 This project consists of a wrapper library around the kubernetes client api as well as an API server that exposes said library. The server can be deployed both locally and as a docker container. 
 
