@@ -25,5 +25,7 @@ spec:
         env:
           - name: PORT
             value: "9000"
+          - name: DEPLOY_STATE
+            value: "PROD"
         ports:
           - containerPort: 9000

@@ -1,5 +1,3 @@
-//Top Level TODOs go here
-
 //TODO: Decide on better naming scheme
 //TODO: Make sure all functions have proper description
 //TODO: Make sure all functions have proper error handling
@@ -7,6 +5,7 @@
 package wrap
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -24,15 +23,18 @@ type DeploymentManager struct {
 }
 
 //ImageDeployment is a collection of necesarry resources for Replication Controller Deployments
+//TODO: May have to add a secret name here?
 type ImageDeployment struct {
-	//RepositoryURI string
-	Repo         string
-	Application  string
-	Revision     string
-	TrafficHosts []string
-	PublicPaths  []string
-	PathPort     string
-	PodCount     int
+	Repo            string
+	Application     string
+	Revision        string
+	TrafficHosts    []string
+	PublicPaths     []string
+	PathPort        string
+	PodCount        int
+	Image           string
+	ImagePullSecret string
+	EnvVars         map[string]string
 }
 
 //CreateDeploymentManager creates an instance of the DeploymentManager from the config passed in, and returns the instance
@@ -81,7 +83,7 @@ func (deploymentManager *DeploymentManager) CreateNamespace(imageDeployment Imag
 	if err != nil {
 		return *ns, err //TODO: Better error handling
 	}
-	return *ns, err
+	return *ns, nil
 }
 
 //GetNamespace <description goes here>
@@ -91,7 +93,7 @@ func (deploymentManager *DeploymentManager) GetNamespace(imageDeployment ImageDe
 	if err != nil {
 		return *ns, err //TODO: Better error handling
 	}
-	return *ns, err
+	return *ns, nil
 }
 
 //DeleteNamespace <description goes here>
@@ -133,6 +135,8 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		return extensions.Deployment{}
 	}
 
+	//TODO: Maybe dont use this?
+	//TODO: Is this deprecated by passing image in the body?
 	reg := os.Getenv("DOCKER_REGISTRY_URL")
 	regString := ""
 	if reg != "" {
@@ -140,6 +144,41 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 	} else {
 		regString = ""
 	}
+
+	//Need to make sure the EnvVars map[string]string into a []api.EnvVar
+	//TODO: This may be really fucking stupid, review
+	var keys []string
+	var values []string
+	for k, v := range imageDeployment.EnvVars {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	envVarTemp := make([]api.EnvVar, len(keys))
+
+	for index, value := range keys {
+		envVarTemp[index].Name = value
+	}
+	for index, value := range values {
+		envVarTemp[index].Value = value
+	}
+
+	portEnvVar := api.EnvVar{
+		Name:  "PORT",
+		Value: imageDeployment.PathPort,
+	}
+	envVarFinal := append(envVarTemp, portEnvVar)
+
+	//TODO: Do we want this
+	var imageTemp string
+	//If no Image is passed in then concatenate path
+	if imageDeployment.Image == "" {
+		imageTemp = regString + imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision
+	} else {
+		imageTemp = imageDeployment.Image
+	}
+
+	calicoPolicy := "allow tcp from label Application=" + imageDeployment.Application + " to ports " + imageDeployment.PathPort + "; allow tcp from app=nginx-ingress"
 
 	depTemplate := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
@@ -163,31 +202,32 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 						"microservice": "true",
 					},
 					Annotations: map[string]string{
-						//TODO: Make Optional
-						"trafficHosts": trafficHosts,
-						"publicPaths":  publicPaths,
-						"pathPort":     imageDeployment.PathPort,
+						//TODO: Should we make this optional?
+						"projectcalico.org/policy": calicoPolicy,
+						"trafficHosts":             trafficHosts,
+						"publicPaths":              publicPaths,
+						"pathPort":                 imageDeployment.PathPort,
 					},
 				},
 				Spec: api.PodSpec{
+					//TODO: Ensure that this works
+					ImagePullSecrets: []api.LocalObjectReference{
+						api.LocalObjectReference{
+							Name: imageDeployment.ImagePullSecret,
+						},
+					},
 					Containers: []api.Container{
 						api.Container{
-							Name: imageDeployment.Application + "-" + imageDeployment.Revision,
-							//TODO: How would we get default images?
-							Image: regString + imageDeployment.Repo + "/" + imageDeployment.Application + ":" + imageDeployment.Revision,
-							Env: []api.EnvVar{
-								api.EnvVar{
-									Name:  "PORT",
-									Value: imageDeployment.PathPort,
-								},
-							},
+							Name:  imageDeployment.Application + "-" + imageDeployment.Revision,
+							Image: imageTemp,
+							Env:   envVarFinal,
 							Ports: []api.ContainerPort{
 								api.ContainerPort{
 									ContainerPort: intPathPort,
 								},
 							},
 							//ReadinessProbe goes here
-							//TODO: Implementation details
+							//TODO: Should we be implementing this? If so how?
 							/*
 								ReadinessProbe: &api.Probe{
 									Handler: api.Handler{
@@ -204,6 +244,10 @@ func constructDeployment(imageDeployment ImageDeployment) extensions.Deployment 
 		},
 		Status: extensions.DeploymentStatus{},
 	}
+	//TODO: Do we want this in final implementation?
+	for key, val := range depTemplate.Spec.Template.Annotations {
+		fmt.Printf(key + ": " + val + "\n") //Print annotations to stdout
+	}
 	return depTemplate
 }
 
@@ -213,7 +257,7 @@ func (deploymentManager *DeploymentManager) GetDeployment(imageDeployment ImageD
 	if err != nil {
 		return *dep, err //TODO: Better error handling
 	}
-	return *dep, err
+	return *dep, nil
 }
 
 //GetDeploymentList <description goes here>
@@ -237,7 +281,7 @@ func (deploymentManager *DeploymentManager) GetDeploymentList(imageDeployment Im
 			return *depList, err //TODO: Better error handling
 		}
 	}
-	return *depList, err
+	return *depList, nil
 }
 
 //CreateDeployment <description goes here>
@@ -248,7 +292,7 @@ func (deploymentManager *DeploymentManager) CreateDeployment(imageDeployment Ima
 	if err != nil {
 		return *dep, err //TODO: Better error handling
 	}
-	return *dep, err
+	return *dep, nil
 }
 
 //UpdateDeployment <description goes here>
@@ -258,5 +302,27 @@ func (deploymentManager *DeploymentManager) UpdateDeployment(imageDeployment Ima
 	if err != nil {
 		return *dep, err //TODO: Better error handling
 	}
-	return *dep, err
+	return *dep, nil
 }
+
+// //ConstructSecret <description goes here>
+// func (deploymentManager *DeploymentManager) ConstructSecret(name string) (api.Secret, error) {
+// 	secretTemplate := api.Secret{
+// 		ObjectMeta: api.ObjectMeta{
+// 			Name: name,
+// 		},
+// 		Data: map[string][]byte{},
+// 		Type: "Opaque",
+// 	}
+// 	return secretTemplate, nil
+// }
+
+// //CreateSecret <description goes here>
+// func (deploymentManager *DeploymentManager) CreateSecret(imageDeployment ImageDeployment) (api.Secret, error) {
+// 	template := ConstructSecret() //TODO
+// 	secret, err := deploymentManager.client.Secrets(imageDeployment.Repo).Create(&template)
+// 	if err != nil {
+// 		return *dep, err //TODO: Better error handling
+// 	}
+// 	return *dep, nil
+// }

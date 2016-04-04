@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/30x/enrober/wrap"
@@ -14,7 +15,26 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
+//Global Variables
+var clientconfig = restclient.Config{
+	Host: "127.0.0.1:8080", //Default to Local Testing
+}
+
 func main() {
+
+	//Set Config
+	var state = os.Getenv("DEPLOY_STATE")
+	switch state {
+	case "PROD":
+		clientconfig.Host = ""
+	case "DEV":
+		clientconfig.Host = "127.0.0.1:8080"
+	case "E2E":
+		clientconfig.Host = ""
+	default:
+		fmt.Printf("Defaulting to Local Dev Setup\n")
+	}
+
 	router := mux.NewRouter()
 
 	sub := router.PathPrefix("/beeswax/deploy/api/v1").Subrouter()
@@ -23,17 +43,10 @@ func main() {
 
 	sub.HandleFunc("/{repo}/{application}", ApplicationHandler).Methods("GET")
 
-	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT")
+	sub.HandleFunc("/{repo}/{application}/{revision}", RevisionHandler).Methods("GET", "PUT", "POST")
 
 	http.ListenAndServe(":9000", router)
-}
 
-//TODO: Maybe use a config file?
-//Global Variables
-var clientconfig = restclient.Config{
-	Host: "127.0.0.1:8080", //Local Testing
-
-	// Host: "", //In Cluster Testing
 }
 
 //RepoHandler does stuff
@@ -154,6 +167,8 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		PublicPaths:  []string{},
 		PathPort:     "",
 		PodCount:     1,
+		EnvVars:      map[string]string{},
+		// Database:     wrap.DBStruct{},
 	}
 
 	//manager
@@ -176,7 +191,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprintf(w, "Got Deployment %v\n", dep.GetName())
 
-	case "PUT":
+	case "PUT", "POST":
 		//Check if namespace already exists
 		getNs, err := dm.GetNamespace(imagedeployment)
 
@@ -192,24 +207,21 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//TODO: Possibly put types somewhere else
+		//Where I'm putting the JSON body
 		type deploymentVariables struct {
-			PodCount     int      `json:"podCount"`
-			TrafficHosts []string `json:"trafficHosts"`
-			PublicPaths  []string `json:"publicPaths"`
-			PathPort     int      `json:"pathPort"`
+			PodCount        int               `json:"podCount"`
+			Image           string            `json:"image"`
+			ImagePullSecret string            `json:"imagePullSecret"`
+			TrafficHosts    []string          `json:"trafficHosts"`
+			PublicPaths     []string          `json:"publicPaths"`
+			PathPort        int               `json:"pathPort"`
+			EnvVars         map[string]string `json:"envVars"`
 		}
 
 		//TODO: Probably a horrifying amount of input validation
 		decoder := json.NewDecoder(r.Body)
 		var t deploymentVariables
 		err = decoder.Decode(&t)
-
-		//TODO: Probably don't want this
-		if t.PodCount != 0 {
-			imagedeployment.PodCount = t.PodCount
-		} else {
-			imagedeployment.PodCount = 1
-		}
 
 		//TrafficHosts can't be empty so fail if it is
 		//TODO: Should do this checking before we create the namespace
@@ -221,6 +233,11 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 
 		imagedeployment.PublicPaths = t.PublicPaths
 		imagedeployment.PathPort = strconv.Itoa(t.PathPort)
+
+		//Make sure this works
+		imagedeployment.EnvVars = t.EnvVars
+
+		imagedeployment.Image = t.Image
 
 		//Check if deployment already exists
 		getDep, err := dm.GetDeployment(imagedeployment)
@@ -236,7 +253,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
-			fmt.Fprintf(w, "Put Deployment %s\n", dep.GetName())
+			fmt.Fprintf(w, "New Deployment %s\n", dep.GetName())
 		} else {
 			//Deployment was found so modify it
 			dep, err := dm.UpdateDeployment(imagedeployment)
@@ -245,7 +262,7 @@ func RevisionHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "In function RevisionHandler\n")
 				return
 			}
-			fmt.Fprintf(w, "Put Deployment %s\n", dep.GetName())
+			fmt.Fprintf(w, "Modified Deployment %s\n", dep.GetName())
 		}
 	}
 }
