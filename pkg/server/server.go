@@ -1,10 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"k8s.io/kubernetes/pkg/api"
@@ -23,6 +26,10 @@ type Server struct {
 
 //Global Kubernetes Client
 var client k8sClient.Client
+
+//Global Regex
+var validIPAddressRegex = regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+var validHostnameRegex = regexp.MustCompile(`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
 
 //Init does stuff
 func Init(clientConfig restclient.Config) error {
@@ -124,7 +131,6 @@ func getEnvironments(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		fmt.Printf("Error in getEnvironments: %v\n", err)
-		fmt.Fprintf(w, "%v\n", err)
 		return
 	}
 	js, err := json.Marshal(nsList)
@@ -146,9 +152,11 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 
 	//Struct to put JSON into
 	type environmentPost struct {
-		EnvironmentName string `json:"environmentName"`
-		Secret          string `json:"secret"`
+		EnvironmentName string   `json:"environmentName"`
+		Secret          string   `json:"secret"`
+		HostNames       []string `json:"hostNames"`
 	}
+
 	//Decode passed JSON body
 	decoder := json.NewDecoder(r.Body)
 	var tempJSON environmentPost
@@ -159,11 +167,62 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//space delimited annotation of valid hostnames
+	var hostsList bytes.Buffer
+
+	//Loop through slice of HostNames
+	for index, value := range tempJSON.HostNames {
+		//Verify each Hostname matches regex
+		validIP := validIPAddressRegex.MatchString(value)
+		validHost := validHostnameRegex.MatchString(value)
+
+		if !validIP && !validHost {
+			//Regex didn't match
+			http.Error(w, "", http.StatusInternalServerError)
+			fmt.Printf("Not a valid hostname: %v\n", value)
+			return
+		}
+		if index == 0 {
+			hostsList.WriteString(value)
+		} else {
+			hostsList.WriteString(" " + value)
+		}
+
+		//TODO: If this becomes a bottleneck at a high number of namespaces come back to this and optimize
+
+		//Verify that hostname isn't on another namespace
+
+		//Get list of all namespace and loop through each of their "validHosts" annotation looking for strings matching our value
+		nsList, err := client.Namespaces().List(api.ListOptions{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Printf("Error in getting nsList in createEnvironment: %v\n", err)
+			fmt.Fprintf(w, "%v\n", err)
+			return
+		}
+
+		for _, ns := range nsList.Items {
+			//Make sure validHosts annotation exists
+			if val, ok := ns.Annotations["validHosts"]; ok {
+				//Get the hostsList annotation
+				if strings.Contains(val, value) {
+					//Duplicate HostNames
+					http.Error(w, "", http.StatusInternalServerError)
+					fmt.Printf("Duplicate Hostname: %v\n", value)
+					return
+				}
+			}
+		}
+	}
+
 	nsObject := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name: pathVars["environmentGroupID"] + "-" + tempJSON.EnvironmentName,
 			Labels: map[string]string{
 				"group": pathVars["environmentGroupID"],
+			},
+			Annotations: map[string]string{
+				"validHosts": hostsList.String(),
 			},
 		},
 	}
@@ -431,6 +490,9 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 	// tempPTS.Annotations = make(map[string]string)
 	tempPTS.Annotations["trafficHosts"] = tempJSON.TrafficHosts
 
+	//Add calico annotations
+	tempPTS.Annotations["projectcalico.org/policy"] = "allow from namespace " + pathVars["environmentGroupID"] + "-" + pathVars["environment"]
+
 	template := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: tempJSON.DeploymentName,
@@ -497,7 +559,6 @@ func getDeployment(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//TODO: Allow modifying the PTS
 //updateDeployment updates a deployment matching the given environmentGroupID, environmentName, and deploymentName
 func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
@@ -527,40 +588,46 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 		//No PTS so check ptsURL
 		fmt.Printf("No PTS\n")
 		if tempJSON.PtsURL == "" {
+			fmt.Printf("No ptsURL\n")
 			//No URL either so error
-			http.Error(w, "", http.StatusInternalServerError)
-			fmt.Printf("No ptsURL or PTS given\n")
-			return
-		}
-		//Get from URL
-		//TODO: Duplicated code, could be moved to helper function
-		//Get JSON from url
-		httpClient := &http.Client{}
+			prevDep, err := client.Deployments(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Get(pathVars["deployment"])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				fmt.Printf("No ptsURL or PTS given and failed to retrieve previous PTS: %v\n", err)
+				return
+			}
+			tempPTS = &prevDep.Spec.Template
+		} else {
+			//Get from URL
+			//TODO: Duplicated code, could be moved to helper function
+			//Get JSON from url
+			httpClient := &http.Client{}
 
-		req, err := http.NewRequest("GET", tempJSON.PtsURL, nil)
-		req.Header.Add("Content-Type", "application/json")
+			req, err := http.NewRequest("GET", tempJSON.PtsURL, nil)
+			req.Header.Add("Content-Type", "application/json")
 
-		//TODO: In the future if we require a secret to access the PTS store
-		// then this call will need to pass in that key.
-		urlJSON, err := httpClient.Do(req)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error retrieving pod template spec: %v\n", err)
-			return
-		}
-		defer urlJSON.Body.Close()
+			//TODO: In the future if we require a secret to access the PTS store
+			// then this call will need to pass in that key.
+			urlJSON, err := httpClient.Do(req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				fmt.Printf("Error retrieving pod template spec: %v\n", err)
+				return
+			}
+			defer urlJSON.Body.Close()
 
-		if urlJSON.StatusCode != 200 {
-			fmt.Printf("Expected 200 got: %v\n", urlJSON.StatusCode)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
+			if urlJSON.StatusCode != 200 {
+				fmt.Printf("Expected 200 got: %v\n", urlJSON.StatusCode)
+				http.Error(w, "", http.StatusInternalServerError)
+				return
+			}
 
-		err = json.NewDecoder(urlJSON.Body).Decode(tempPTS)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error decoding PTS JSON Body: %v\n", err)
-			return
+			err = json.NewDecoder(urlJSON.Body).Decode(tempPTS)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				fmt.Printf("Error decoding PTS JSON Body: %v\n", err)
+				return
+			}
 		}
 	} else {
 		//We got a direct PTS so just copy it
