@@ -67,6 +67,15 @@ paths:
       responses:
         201:
           description: Created
+          schema:
+            properties:
+              publicSecret:
+                type: string
+                description: 256-bit generated public-api-key
+              privateSecret:
+                type: string
+                description: 256-bit generated private-api-key
+
         403:
           description: Forbidden
         default:
@@ -116,6 +125,15 @@ paths:
       responses:
         200:
           description: Successful response
+          schema:
+            properties:
+              publicSecret:
+                type: string
+                description: 256-bit generated public-api-key
+              privateSecret:
+                type: string
+                description: 256-bit generated private-api-key
+
         403:
           description: Forbidden
         404: 
