@@ -17,6 +17,8 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
+
+	"github.com/30x/enrober/pkg/helper"
 )
 
 //Server struct
@@ -31,7 +33,7 @@ var client k8sClient.Client
 var validIPAddressRegex = regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
 var validHostnameRegex = regexp.MustCompile(`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
 
-//Init does stuff
+//Init runs once
 func Init(clientConfig restclient.Config) error {
 	var err error
 	var tempClient *k8sClient.Client
@@ -153,8 +155,8 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	//Struct to put JSON into
 	type environmentPost struct {
 		EnvironmentName string   `json:"environmentName"`
-		PrivateSecret   string   `json:"privateSecret"`
-		PublicSecret    string   `json:"publicSecret"`
+		PrivateSecret   bool     `json:"privateSecret"`
+		PublicSecret    bool     `json:"publicSecret"`
 		HostNames       []string `json:"hostNames"`
 	}
 
@@ -242,11 +244,44 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "routing",
 		},
-		Data: map[string][]byte{
-			"public":  []byte(tempJSON.PublicSecret),
-			"private": []byte(tempJSON.PrivateSecret),
-		},
+		Data: map[string][]byte{},
 		Type: "Opaque",
+	}
+
+	//Check whether we need a public-api-key, private-api-key, or both
+	if tempJSON.PrivateSecret == true && tempJSON.PublicSecret == true {
+		//Generate two random numbers
+		privateKey, err := helper.GenerateRandomString(32)
+		publicKey, err := helper.GenerateRandomString(32)
+		if err != nil {
+			fmt.Printf("Error generating random string: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+		tempSecret.Data["public-api-key"] = []byte(publicKey)
+		tempSecret.Data["private-api-key"] = []byte(privateKey)
+
+	} else if tempJSON.PublicSecret == true && tempJSON.PrivateSecret == false {
+		//Just a publicKey
+		publicKey, err := helper.GenerateRandomString(32)
+		if err != nil {
+			fmt.Printf("Error generating random string: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+		tempSecret.Data["public-api-key"] = []byte(publicKey)
+
+	} else if tempJSON.PublicSecret == false && tempJSON.PrivateSecret == true {
+		//Just a privateKey
+		privateKey, err := helper.GenerateRandomString(32)
+		if err != nil {
+			fmt.Printf("Error generating random string: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+		tempSecret.Data["private-api-key"] = []byte(privateKey)
+	} else {
+		//No keys, for now that's gonna be an errorf
+		fmt.Printf("Error: No API Key Requested\n")
+		http.Error(w, "No API Key Requested", http.StatusInternalServerError)
+		return
 	}
 
 	//Create Secret
@@ -258,11 +293,12 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	//Print to console for logging
 	fmt.Printf("Created Secret: %v\n", secret.GetName())
 
-	js, err := json.Marshal(createdNs)
+	js, err := json.Marshal(secret.Data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		fmt.Printf("Error marshalling namespace: %v\n", err)
 	}
+
 	w.WriteHeader(201)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(js)
@@ -314,8 +350,8 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 
 	//Struct to put JSON into
 	type environmentPost struct {
-		PrivateSecret string   `json:"privateSecret"`
-		PublicSecret  string   `json:"publicSecret"`
+		PrivateSecret bool     `json:"privateSecret"`
+		PublicSecret  bool     `json:"publicSecret"`
 		HostNames     []string `json:"hostNames"`
 	}
 	//Decode passed JSON body
@@ -323,14 +359,16 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 	var tempJSON environmentPost
 	err := decoder.Decode(&tempJSON)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		fmt.Printf("Error decoding JSON Body: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	//Check if there is a secret named routing in the given environment
 	getSecret, err := client.Secrets(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Get("routing")
 	if err != nil {
+		//Create new secret
+
 		test := errors.New("secret \"routing\" not found")
 		if err.Error() == test.Error() {
 			//Create secret
@@ -338,12 +376,42 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "routing",
 				},
-				Data: map[string][]byte{
-					"public":  []byte(tempJSON.PublicSecret),
-					"private": []byte(tempJSON.PrivateSecret),
-				},
+				Data: map[string][]byte{},
 				Type: "Opaque",
 			}
+
+			//TODO: Refactor this shit
+			//Check whether we need a public-api-key, private-api-key, or both
+			if tempJSON.PrivateSecret == true && tempJSON.PublicSecret == true {
+				//Generate two random numbers
+				privateKey, err := helper.GenerateRandomString(32)
+				publicKey, err := helper.GenerateRandomString(32)
+				if err != nil {
+					fmt.Printf("Error generating random string: %v\n", err)
+					http.Error(w, "", http.StatusInternalServerError)
+				}
+				tempSecret.Data["public-api-key"] = []byte(publicKey)
+				tempSecret.Data["private-api-key"] = []byte(privateKey)
+
+			} else if tempJSON.PublicSecret == true && tempJSON.PrivateSecret == false {
+				//Just a publicKey
+				publicKey, err := helper.GenerateRandomString(32)
+				if err != nil {
+					fmt.Printf("Error generating random string: %v\n", err)
+					http.Error(w, "", http.StatusInternalServerError)
+				}
+				tempSecret.Data["public-api-key"] = []byte(publicKey)
+
+			} else if tempJSON.PublicSecret == false && tempJSON.PrivateSecret == true {
+				//Just a privateKey
+				privateKey, err := helper.GenerateRandomString(32)
+				if err != nil {
+					fmt.Printf("Error generating random string: %v\n", err)
+					http.Error(w, "", http.StatusInternalServerError)
+				}
+				tempSecret.Data["private-api-key"] = []byte(privateKey)
+			}
+
 			secret, err := client.Secrets(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Create(&tempSecret)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -351,8 +419,16 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			js, err := json.Marshal(secret.Data)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				fmt.Printf("Error marshalling namespace: %v\n", err)
+			}
+
 			w.WriteHeader(200)
-			fmt.Fprintf(w, "Created Secret: %v\n", secret.GetName())
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(js)
+
 			fmt.Printf("Created Secret: %v\n", secret.GetName())
 
 		} else {
@@ -361,17 +437,57 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		getSecret.Data["private"] = []byte(tempJSON.PrivateSecret)
-		getSecret.Data["public"] = []byte(tempJSON.PublicSecret)
+		//Modify existing secret
+
+		//TODO: Refactor this shit
+		//Check whether we need a public-api-key, private-api-key, or both
+		if tempJSON.PrivateSecret == true && tempJSON.PublicSecret == true {
+			//Generate two random numbers
+			privateKey, err := helper.GenerateRandomString(32)
+			publicKey, err := helper.GenerateRandomString(32)
+			if err != nil {
+				fmt.Printf("Error generating random string: %v\n", err)
+				http.Error(w, "", http.StatusInternalServerError)
+			}
+			getSecret.Data["public-api-key"] = []byte(publicKey)
+			getSecret.Data["private-api-key"] = []byte(privateKey)
+
+		} else if tempJSON.PublicSecret == true && tempJSON.PrivateSecret == false {
+			//Just a publicKey
+			publicKey, err := helper.GenerateRandomString(32)
+			if err != nil {
+				fmt.Printf("Error generating random string: %v\n", err)
+				http.Error(w, "", http.StatusInternalServerError)
+			}
+			getSecret.Data["public-api-key"] = []byte(publicKey)
+
+		} else if tempJSON.PublicSecret == false && tempJSON.PrivateSecret == true {
+			//Just a privateKey
+			privateKey, err := helper.GenerateRandomString(32)
+			if err != nil {
+				fmt.Printf("Error generating random string: %v\n", err)
+				http.Error(w, "", http.StatusInternalServerError)
+			}
+			getSecret.Data["private-api-key"] = []byte(privateKey)
+		}
+
 		secret, err := client.Secrets(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Update(getSecret)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			fmt.Printf("Error updating secret: %v\n", err)
 		}
 
+		js, err := json.Marshal(secret.Data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Printf("Error marshalling namespace: %v\n", err)
+		}
+
 		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(js)
+
 		fmt.Printf("Updated Secret: %v\n", secret.GetName())
-		fmt.Fprintf(w, "Updated Secret: %v\n", secret.GetName())
 
 	}
 }
@@ -379,9 +495,6 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 //deleteEnvironment deletes a kubernetes namespace matching the given environmentGroupID and environmentName
 func deleteEnvironment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
-
-	//TODO: Can only delete a namespace based on its name not it's annotations.
-	//Ensure that this is thorough enough for our uses.
 
 	err := client.Namespaces().Delete(pathVars["environmentGroupID"] + "-" + pathVars["environment"])
 	if err != nil {
@@ -424,7 +537,6 @@ func getDeployments(w http.ResponseWriter, r *http.Request) {
 func createDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
 
-	//TODO: Could be moved to types file
 	//Struct to put JSON into
 	type deploymentPost struct {
 		DeploymentName string               `json:"deploymentName"`
@@ -432,7 +544,7 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		PublicPaths    string               `json:"publicPaths"`
 		PrivateHosts   string               `json:"privateHosts"`
 		PrivatePaths   string               `json:"privatePaths"`
-		Replicas       int                  `json:"Replicas"`
+		Replicas       int                  `json:"replicas"`
 		PtsURL         string               `json:"ptsURL"`
 		PTS            *api.PodTemplateSpec `json:"pts"`
 	}
@@ -529,10 +641,16 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//TODO: Need to check that there are no other deployments with the same MatchLabels otherwise things go crazy.
-	//Get list of all deployments in namespace
-	//Loop through looking for MatchLabels["app"] = tempPTS.Labels["app"]
-	//Break out of loop and return error if one is found
-	//Should probably return a useful message to user at this point
+	labelSelector, err := labels.Parse("app=" + tempPTS.Labels["app"])
+	//Get list of all deployments in namespace with MatchLabels["app"] = tempPTS.Labels["app"]
+	depList, err := client.Deployments(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).List(api.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if len(depList.Items) != 0 {
+		fmt.Printf("LabelSelector " + labelSelector.String() + " already exists")
+		http.Error(w, "LabelSelector "+labelSelector.String()+" already exists", http.StatusInternalServerError)
+		return
+	}
 
 	//Create Deployment
 	dep, err := client.Deployments(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Create(&template)
@@ -589,7 +707,6 @@ func getDeployment(w http.ResponseWriter, r *http.Request) {
 func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
 
-	//TODO: Could be moved to types file
 	//Struct to put JSON into
 	type deploymentPatch struct {
 		PublicHosts  string               `json:"publicHosts"`
