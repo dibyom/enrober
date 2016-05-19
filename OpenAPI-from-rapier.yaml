@@ -8,7 +8,7 @@ produces:
 - application/json
 - text/html
 x-interfaces:
-  Deployment: &Deployment
+  Deployment:
     get:
       description: Retrieve a Deployment
       parameters:
@@ -399,77 +399,6 @@ x-interfaces:
           $ref: '#/responses/406'
         default:
           $ref: '#/responses/default'
-    patch:
-      consumes:
-      - application/merge-patch+json
-      description: Update a SharingSet entity
-      parameters:
-      - $ref: '#/parameters/If-Match'
-      - description: The subset of properties of the SharingSet being updated
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/SharingSet'
-      responses:
-        '200':
-          description: successful
-          headers:
-            Content-Location:
-              description: perma-link URL of resource
-              type: string
-            Content-Type:
-              description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
-              type: string
-          schema:
-            $ref: '#/definitions/SharingSet'
-        '400':
-          $ref: '#/responses/400'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        '406':
-          $ref: '#/responses/406'
-        '409':
-          $ref: '#/responses/409'
-        default:
-          $ref: '#/responses/default'
-    delete:
-      description: Delete a SharingSet
-      responses:
-        '200':
-          description: successful
-          headers:
-            Content-Location:
-              description: perma-link URL of resource
-              type: string
-            Content-Type:
-              description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
-              type: string
-          schema:
-            $ref: '#/definitions/SharingSet'
-        '400':
-          $ref: '#/responses/400'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        '406':
-          $ref: '#/responses/406'
-        default:
-          $ref: '#/responses/default'
     head:
       description: retrieve HEAD
       responses:
@@ -500,7 +429,7 @@ x-interfaces:
         default:
           $ref: '#/responses/default'
     x-id: SharingSet
-  SharingSet.environments:
+  SharingSet.environments: &SharingSet-environments
     get:
       responses:
         '200':
@@ -734,21 +663,36 @@ x-interfaces:
           $ref: '#/responses/default'
     x-id: Shipyard.environments
   Shipyard.sharingSets:
-    get:
+    post:
+      description: Create a new SharingSet
+      parameters:
+      - description: The representation of the new SharingSet being created
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/SharingSet'
+      - description: The media type of the body
+        in: header
+        name: Content-Type
+        required: true
+        type: string
       responses:
-        '200':
-          description: description
+        '201':
+          description: Created new SharingSet
           headers:
-            Content-Location:
-              description: perma-link URL of collection
-              type: string
             Content-Type:
               description: The media type of the returned body
               type: string
+            ETag:
+              description: Value of ETag required for subsequent updates
+              type: string
+            Location:
+              description: perma-link URL of newly-created SharingSet
+              type: string
           schema:
-            $ref: '#/definitions/Collection'
-        '303':
-          $ref: '#/responses/303'
+            $ref: '#/definitions/SharingSet'
+        '400':
+          $ref: '#/responses/400'
         '401':
           $ref: '#/responses/401'
         '403':
@@ -757,19 +701,6 @@ x-interfaces:
           $ref: '#/responses/404'
         '406':
           $ref: '#/responses/406'
-        default:
-          $ref: '#/responses/default'
-    head:
-      description: Retrieve HEAD
-      responses:
-        '200':
-          $ref: '#/responses/standard_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
         default:
           $ref: '#/responses/default'
     options:
@@ -801,6 +732,13 @@ paths:
       required: true
       type: string
     <<: *SharingSet
+  /sharingSets/{id}/environments:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      type: string
+    <<: *SharingSet-environments
   /sharingSets/{id}/environments/{name_1}:
     parameters:
     - in: path
@@ -842,13 +780,6 @@ paths:
     $ref: '#/x-interfaces/Shipyard.environments'
   /deployments:
     $ref: '#/x-interfaces/Shipyard.deployments'
-  /deployments/{name}:
-    parameters:
-    - in: path
-      name: name
-      required: true
-      type: string
-    <<: *Deployment
 definitions:
   ErrorResponse:
     type: string
@@ -880,7 +811,7 @@ definitions:
         type: string
         format: uri
         x-interface: '#/x-interfaces/SharingSet.environments'
-        readOnly: true
+    readOnly: true
     x-interface: '#/x-interfaces/SharingSet'
   Environment:
     properties:
@@ -928,6 +859,10 @@ definitions:
       replicas:
         type: integer
         description: How many replicas to be deployed
+      environment:
+        type: string
+        format: uri
+        x-interface: '#/x-interfaces/Environment'
       podTemplateSpec:
         description: Pod Template Spec. could be a URL or an in-line PTS
         x-oneOf:
@@ -945,7 +880,7 @@ definitions:
         type: string
         enum:
         - Collection
-      items:
+      contents:
         type: array
         items:
           type: object

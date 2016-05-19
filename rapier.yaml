@@ -14,11 +14,11 @@ entities:
     - environments
     - sharingSets
     - sharingSets;{id}
+    - sharingSets;{id}/environments
     - sharingSets;{id}/environments;{name}
     - sharingSets;{id}/environments;{name}/deployments
     - sharingSets;{id}/environments;{name}/deployments;{name}
     - deployments
-    - deployments;{name}
     properties:
       isA:
         type: string
@@ -30,7 +30,7 @@ entities:
           entities: '#SharingSet'
           multiplicity: n
           collectionResource: '#Collection'
-          readOnly: true
+          usage: c
       environments:
         type: string
         format: uri
@@ -60,7 +60,7 @@ entities:
           multiplicity: n
           collectionResource: '#Collection'
           readOnly: true
-        readOnly: true    
+    readOnly: true    
   Environment:
     properties:
       isA:
@@ -69,6 +69,7 @@ entities:
       sharingSet:
         type: string
         format: uri
+        usage: c r #write once, read many
       name:
         type: string
         usage: c r #write once, read many
@@ -109,6 +110,11 @@ entities:
       replicas:
         type: integer
         description: How many replicas to be deployed
+      environment:
+        type: string
+        format: uri
+        relationship: '#Environment'
+        usage: c r #write once, read many
       podTemplateSpec:
         description: Pod Template Spec. could be a URL or an in-line PTS       
         oneOf:
@@ -125,7 +131,7 @@ entities:
       isA:
         type: string
         enum: [Collection]
-      items:
+      contents:
         type: array
         items: 
           type: object
