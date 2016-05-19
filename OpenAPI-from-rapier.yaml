@@ -1,3 +1,8 @@
+x-description: '*** This document is not a specification of an API. This document
+  includes implementation-specific additions and modifications to an API that are
+  designed to aid implementation-aware software like proxies and implementation frameworks.
+  If you are looking for the API specification, find the version that was generated
+  without implementation extensions and modifications'
 swagger: '2.0'
 info:
   title: Shipyard Deployment API
@@ -8,7 +13,7 @@ produces:
 - application/json
 - text/html
 x-interfaces:
-  Deployment:
+  Deployment: &Deployment
     get:
       description: Retrieve a Deployment
       parameters:
@@ -26,6 +31,12 @@ x-interfaces:
             ETag:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
+              type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
               type: string
           schema:
             $ref: '#/definitions/Deployment'
@@ -64,6 +75,12 @@ x-interfaces:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
               type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
+              type: string
           schema:
             $ref: '#/definitions/Deployment'
         '400':
@@ -95,6 +112,12 @@ x-interfaces:
             ETag:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
+              type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
               type: string
           schema:
             $ref: '#/definitions/Deployment'
@@ -159,6 +182,12 @@ x-interfaces:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
               type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
+              type: string
           schema:
             $ref: '#/definitions/Environment'
         '401':
@@ -196,6 +225,12 @@ x-interfaces:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
               type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
+              type: string
           schema:
             $ref: '#/definitions/Environment'
         '400':
@@ -227,6 +262,12 @@ x-interfaces:
             ETag:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
+              type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
               type: string
           schema:
             $ref: '#/definitions/Environment'
@@ -284,6 +325,12 @@ x-interfaces:
             Content-Type:
               description: The media type of the returned body
               type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
+              type: string
           schema:
             $ref: '#/definitions/Collection'
         '303':
@@ -299,13 +346,13 @@ x-interfaces:
         default:
           $ref: '#/responses/default'
     post:
-      description: Create a new Environment
+      description: Create a new Deployment
       parameters:
-      - description: The representation of the new Environment being created
+      - description: The representation of the new Deployment being created
         in: body
         name: body
         schema:
-          $ref: '#/definitions/Environment'
+          $ref: '#/definitions/Deployment'
       - description: The media type of the body
         in: header
         name: Content-Type
@@ -313,7 +360,7 @@ x-interfaces:
         type: string
       responses:
         '201':
-          description: Created new Environment
+          description: Created new Deployment
           headers:
             Content-Type:
               description: The media type of the returned body
@@ -322,10 +369,16 @@ x-interfaces:
               description: Value of ETag required for subsequent updates
               type: string
             Location:
-              description: perma-link URL of newly-created Environment
+              description: perma-link URL of newly-created Deployment
+              type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
               type: string
           schema:
-            $ref: '#/definitions/Environment'
+            $ref: '#/definitions/Deployment'
         '400':
           $ref: '#/responses/400'
         '401':
@@ -368,123 +421,6 @@ x-interfaces:
         default:
           $ref: '#/responses/default'
     x-id: Environment.deployments
-  SharingSet: &SharingSet
-    get:
-      description: Retrieve a SharingSet
-      parameters:
-      - $ref: '#/parameters/Accept'
-      responses:
-        '200':
-          description: successful
-          headers:
-            Content-Location:
-              description: perma-link URL of resource
-              type: string
-            Content-Type:
-              description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
-              type: string
-          schema:
-            $ref: '#/definitions/SharingSet'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        '406':
-          $ref: '#/responses/406'
-        default:
-          $ref: '#/responses/default'
-    head:
-      description: retrieve HEAD
-      responses:
-        '200':
-          $ref: '#/responses/standard_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        default:
-          $ref: '#/responses/default'
-    options:
-      description: Retrieve OPTIONS
-      parameters:
-      - $ref: '#/parameters/Access-Control-Request-Method'
-      - $ref: '#/parameters/Access-Control-Request-Headers'
-      responses:
-        '200':
-          $ref: '#/responses/options_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        default:
-          $ref: '#/responses/default'
-    x-id: SharingSet
-  SharingSet.environments: &SharingSet-environments
-    get:
-      responses:
-        '200':
-          description: description
-          headers:
-            Content-Location:
-              description: perma-link URL of collection
-              type: string
-            Content-Type:
-              description: The media type of the returned body
-              type: string
-          schema:
-            $ref: '#/definitions/Collection'
-        '303':
-          $ref: '#/responses/303'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        '406':
-          $ref: '#/responses/406'
-        default:
-          $ref: '#/responses/default'
-    head:
-      description: Retrieve HEAD
-      responses:
-        '200':
-          $ref: '#/responses/standard_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        default:
-          $ref: '#/responses/default'
-    options:
-      description: Retrieve OPTIONS
-      parameters:
-      - $ref: '#/parameters/Access-Control-Request-Method'
-      - $ref: '#/parameters/Access-Control-Request-Headers'
-      responses:
-        '200':
-          $ref: '#/responses/options_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        default:
-          $ref: '#/responses/default'
-    x-id: SharingSet.environments
   Shipyard:
     get:
       description: Retrieve a Shipyard
@@ -503,6 +439,12 @@ x-interfaces:
             ETag:
               description: this value must be echoed in the If-Match header of every
                 PATCH or PUT
+              type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
               type: string
           schema:
             $ref: '#/definitions/Shipyard'
@@ -546,64 +488,6 @@ x-interfaces:
         default:
           $ref: '#/responses/default'
     x-id: Shipyard
-  Shipyard.deployments:
-    post:
-      description: Create a new Deployment
-      parameters:
-      - description: The representation of the new Deployment being created
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/Deployment'
-      - description: The media type of the body
-        in: header
-        name: Content-Type
-        required: true
-        type: string
-      responses:
-        '201':
-          description: Created new Deployment
-          headers:
-            Content-Type:
-              description: The media type of the returned body
-              type: string
-            ETag:
-              description: Value of ETag required for subsequent updates
-              type: string
-            Location:
-              description: perma-link URL of newly-created Deployment
-              type: string
-          schema:
-            $ref: '#/definitions/Deployment'
-        '400':
-          $ref: '#/responses/400'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        '406':
-          $ref: '#/responses/406'
-        default:
-          $ref: '#/responses/default'
-    options:
-      description: Retrieve OPTIONS
-      parameters:
-      - $ref: '#/parameters/Access-Control-Request-Method'
-      - $ref: '#/parameters/Access-Control-Request-Headers'
-      responses:
-        '200':
-          $ref: '#/responses/options_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        default:
-          $ref: '#/responses/default'
-    x-id: Shipyard.deployments
   Shipyard.environments:
     post:
       description: Create a new Environment
@@ -630,6 +514,12 @@ x-interfaces:
               type: string
             Location:
               description: perma-link URL of newly-created Environment
+              type: string
+            Vary:
+              description: Make sure a cache of one content type is not returned to
+                a client wanting a different one.
+              enum:
+              - Accept
               type: string
           schema:
             $ref: '#/definitions/Environment'
@@ -662,124 +552,64 @@ x-interfaces:
         default:
           $ref: '#/responses/default'
     x-id: Shipyard.environments
-  Shipyard.sharingSets:
-    post:
-      description: Create a new SharingSet
-      parameters:
-      - description: The representation of the new SharingSet being created
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/SharingSet'
-      - description: The media type of the body
-        in: header
-        name: Content-Type
-        required: true
-        type: string
-      responses:
-        '201':
-          description: Created new SharingSet
-          headers:
-            Content-Type:
-              description: The media type of the returned body
-              type: string
-            ETag:
-              description: Value of ETag required for subsequent updates
-              type: string
-            Location:
-              description: perma-link URL of newly-created SharingSet
-              type: string
-          schema:
-            $ref: '#/definitions/SharingSet'
-        '400':
-          $ref: '#/responses/400'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        '406':
-          $ref: '#/responses/406'
-        default:
-          $ref: '#/responses/default'
-    options:
-      description: Retrieve OPTIONS
-      parameters:
-      - $ref: '#/parameters/Access-Control-Request-Method'
-      - $ref: '#/parameters/Access-Control-Request-Headers'
-      responses:
-        '200':
-          $ref: '#/responses/options_200'
-        '401':
-          $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
-        default:
-          $ref: '#/responses/default'
-    x-id: Shipyard.sharingSets
+x-templates:
+  '{Environment-URL}':
+    $ref: '#/x-interfaces/Environment'
+  '{Environment-URL}/deployments':
+    $ref: '#/x-interfaces/Environment.deployments'
+  '{Environment-URL}/deployments/{name}':
+    parameters:
+    - in: path
+      name: name
+      required: true
+      type: string
+    <<: *Deployment
+  '{Shipyard-URL}':
+    $ref: '#/x-interfaces/Shipyard'
+  '{Shipyard-URL}/environments':
+    $ref: '#/x-interfaces/Shipyard.environments'
 paths:
   /:
-    $ref: '#/x-interfaces/Shipyard'
-  /sharingSets:
-    $ref: '#/x-interfaces/Shipyard.sharingSets'
-  /sharingSets/{id}:
+    $ref: '#/x-templates/{Shipyard-URL}'
+  /environments:
+    $ref: '#/x-templates/{Shipyard-URL}~1environments'
+  /environments/{orgName-envName}:
+    x-description: '*** This path is not part of the API - it is an implementation-private
+      extension'
     parameters:
-    - in: path
-      name: id
-      required: true
-      type: string
-    <<: *SharingSet
-  /sharingSets/{id}/environments:
-    parameters:
-    - in: path
-      name: id
-      required: true
-      type: string
-    <<: *SharingSet-environments
-  /sharingSets/{id}/environments/{name_1}:
-    parameters:
-    - in: path
-      name: id
-      required: true
-      type: string
-    - in: path
-      name: name_1
+    - description: This parameter is a private part of the implementation. It is not
+        part of the API
+      in: path
+      name: orgName-envName
       required: true
       type: string
     <<: *Environment
-  /sharingSets/{id}/environments/{name_1}/deployments:
+  /environments/{orgName-envName}/deployments:
+    x-description: '*** This path is not part of the API - it is an implementation-private
+      extension'
     parameters:
-    - in: path
-      name: id
-      required: true
-      type: string
-    - in: path
-      name: name_1
+    - description: This parameter is a private part of the implementation. It is not
+        part of the API
+      in: path
+      name: orgName-envName
       required: true
       type: string
     <<: *Environment-deployments
-  /sharingSets/{id}/environments/{name_1}/deployments/{name_2}:
+  /environments/{orgName-envName}/deployments/{name}:
+    x-description: '*** This path is not part of the API - it is an implementation-private
+      extension'
     parameters:
-    - in: path
-      name: id
+    - description: This parameter is a private part of the implementation. It is not
+        part of the API
+      in: path
+      name: orgName-envName
       required: true
       type: string
     - in: path
-      name: name_1
+      name: name
       required: true
       type: string
-    - in: path
-      name: name_2
-      required: true
-      type: string
-    <<: *Environment
-  /environments:
-    $ref: '#/x-interfaces/Shipyard.environments'
-  /deployments:
-    $ref: '#/x-interfaces/Shipyard.deployments'
+    <<: *Deployment
 definitions:
   ErrorResponse:
     type: string
@@ -789,30 +619,12 @@ definitions:
         type: string
         enum:
         - Shipyard
-      sharingSets:
-        type: string
-        format: uri
-        x-interface: '#/x-interfaces/Shipyard.sharingSets'
       environments:
         type: string
         format: uri
         x-interface: '#/x-interfaces/Shipyard.environments'
-      deployments:
-        type: string
-        format: uri
-        x-interface: '#/x-interfaces/Shipyard.deployments'
     readOnly: true
     x-interface: '#/x-interfaces/Shipyard'
-  SharingSet:
-    properties:
-      id:
-        type: string
-      environments:
-        type: string
-        format: uri
-        x-interface: '#/x-interfaces/SharingSet.environments'
-    readOnly: true
-    x-interface: '#/x-interfaces/SharingSet'
   Environment:
     properties:
       isA:

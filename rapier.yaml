@@ -12,55 +12,19 @@ entities:
     wellKnownURLs: /
     queryPaths:
     - environments
-    - sharingSets
-    - sharingSets;{id}
-    - sharingSets;{id}/environments
-    - sharingSets;{id}/environments;{name}
-    - sharingSets;{id}/environments;{name}/deployments
-    - sharingSets;{id}/environments;{name}/deployments;{name}
-    - deployments
     properties:
       isA:
         type: string
         enum: [Shipyard]
-      sharingSets:
-        type: string
-        format: uri
-        relationship:
-          entities: '#SharingSet'
-          multiplicity: n
-          collectionResource: '#Collection'
-          usage: c
       environments:
         type: string
         format: uri
         relationship:
           entities: '#Environment'
-          multiplicity: n
-          collectionResource: '#Collection'
-          usage: c        
-      deployments:
-        type: string
-        format: uri
-        relationship:
-          entities: '#Deployment'
           multiplicity: n
           collectionResource: '#Collection'
           usage: c        
     readOnly: true
-  SharingSet:
-    properties:
-      id:
-        type: string
-      environments:
-        type: string
-        format: uri
-        relationship:
-          entities: '#Environment'
-          multiplicity: n
-          collectionResource: '#Collection'
-          readOnly: true
-    readOnly: true    
   Environment:
     properties:
       isA:
@@ -87,9 +51,11 @@ entities:
         type: string
         format: uri
         relationship:
-          entities: '#Environment'
+          entities: '#Deployment'
           multiplicity: n
           collectionResource: '#Collection'
+    queryPaths: deployments deployments;{name}
+    permalinkTemplate: /environments/{orgName-envName} 
   Deployment:
     properties:
       isA:
