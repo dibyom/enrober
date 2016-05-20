@@ -55,7 +55,9 @@ entities:
           entities: '#Deployment'
           multiplicity: n
           collectionResource: '#Collection'
-    queryPaths: deployments deployments;{name}
+    queryPaths: 
+    - deployments 
+    - deployments;{name}
     permalinkTemplate: /environments/{sharingSetName-envName} 
   Deployment:
     properties:
