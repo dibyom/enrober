@@ -28,10 +28,6 @@ x-interfaces:
             Content-Type:
               description: The media type of the returned body
               type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
-              type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
                 a client wanting a different one.
@@ -55,7 +51,6 @@ x-interfaces:
       - application/merge-patch+json
       description: Update a Deployment entity
       parameters:
-      - $ref: '#/parameters/If-Match'
       - description: The subset of properties of the Deployment being updated
         in: body
         name: body
@@ -70,10 +65,6 @@ x-interfaces:
               type: string
             Content-Type:
               description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
               type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
@@ -93,8 +84,6 @@ x-interfaces:
           $ref: '#/responses/404'
         '406':
           $ref: '#/responses/406'
-        '409':
-          $ref: '#/responses/409'
         default:
           $ref: '#/responses/default'
     delete:
@@ -108,10 +97,6 @@ x-interfaces:
               type: string
             Content-Type:
               description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
               type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
@@ -178,10 +163,6 @@ x-interfaces:
             Content-Type:
               description: The media type of the returned body
               type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
-              type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
                 a client wanting a different one.
@@ -205,7 +186,6 @@ x-interfaces:
       - application/merge-patch+json
       description: Update an Environment entity
       parameters:
-      - $ref: '#/parameters/If-Match'
       - description: The subset of properties of the Environment being updated
         in: body
         name: body
@@ -220,10 +200,6 @@ x-interfaces:
               type: string
             Content-Type:
               description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
               type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
@@ -243,8 +219,6 @@ x-interfaces:
           $ref: '#/responses/404'
         '406':
           $ref: '#/responses/406'
-        '409':
-          $ref: '#/responses/409'
         default:
           $ref: '#/responses/default'
     delete:
@@ -258,10 +232,6 @@ x-interfaces:
               type: string
             Content-Type:
               description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
               type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
@@ -365,9 +335,6 @@ x-interfaces:
             Content-Type:
               description: The media type of the returned body
               type: string
-            ETag:
-              description: Value of ETag required for subsequent updates
-              type: string
             Location:
               description: perma-link URL of newly-created Deployment
               type: string
@@ -435,10 +402,6 @@ x-interfaces:
               type: string
             Content-Type:
               description: The media type of the returned body
-              type: string
-            ETag:
-              description: this value must be echoed in the If-Match header of every
-                PATCH or PUT
               type: string
             Vary:
               description: Make sure a cache of one content type is not returned to
@@ -509,9 +472,6 @@ x-interfaces:
             Content-Type:
               description: The media type of the returned body
               type: string
-            ETag:
-              description: Value of ETag required for subsequent updates
-              type: string
             Location:
               description: perma-link URL of newly-created Environment
               type: string
@@ -573,36 +533,36 @@ paths:
     $ref: '#/x-templates/{Shipyard-URL}'
   /environments:
     $ref: '#/x-templates/{Shipyard-URL}~1environments'
-  /environments/{orgName-envName}:
+  /environments/{sharingSetName-envName}:
     x-description: '*** This path is not part of the API - it is an implementation-private
       extension'
     parameters:
     - description: This parameter is a private part of the implementation. It is not
         part of the API
       in: path
-      name: orgName-envName
+      name: sharingSetName-envName
       required: true
       type: string
     <<: *Environment
-  /environments/{orgName-envName}/deployments:
+  /environments/{sharingSetName-envName}/deployments:
     x-description: '*** This path is not part of the API - it is an implementation-private
       extension'
     parameters:
     - description: This parameter is a private part of the implementation. It is not
         part of the API
       in: path
-      name: orgName-envName
+      name: sharingSetName-envName
       required: true
       type: string
     <<: *Environment-deployments
-  /environments/{orgName-envName}/deployments/{name}:
+  /environments/{sharingSetName-envName}/deployments/{name}:
     x-description: '*** This path is not part of the API - it is an implementation-private
       extension'
     parameters:
     - description: This parameter is a private part of the implementation. It is not
         part of the API
       in: path
-      name: orgName-envName
+      name: sharingSetName-envName
       required: true
       type: string
     - in: path
@@ -724,12 +684,6 @@ parameters:
     name: Access-Control-Request-Method
     required: true
     type: string
-  If-Match:
-    description: specifies the last known ETag value of the resource being modified
-    in: header
-    name: If-Match
-    required: true
-    type: string
 responses:
   '303':
     description: See other. Server is redirecting client to a different resource
@@ -756,11 +710,6 @@ responses:
       $ref: '#/definitions/ErrorResponse'
   '406':
     description: Not Acceptable. Requested media type not available
-    schema:
-      $ref: '#/definitions/ErrorResponse'
-  '409':
-    description: Conflict. Value provided in If-Match header does not match current
-      ETag value of resource
     schema:
       $ref: '#/definitions/ErrorResponse'
   default:
@@ -790,10 +739,6 @@ responses:
         type: string
       Content-Type:
         description: The media type of the returned body
-        type: string
-      ETag:
-        description: this value must be echoed in the If-Match header of every PATCH
-          or PUT
         type: string
 securityDefinitions:
   sso:

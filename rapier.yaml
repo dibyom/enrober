@@ -4,6 +4,7 @@ consumes: application/json
 produces: application/json text/html
 conventions:
   queryPathSelectorLocation: pathSegment
+  useEtag: False
   patchConsumes: application/merge-patch+json
   errorResponse:
     type: string
