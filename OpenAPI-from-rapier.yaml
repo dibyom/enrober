@@ -512,55 +512,39 @@ x-interfaces:
         default:
           $ref: '#/responses/default'
     x-id: Shipyard.environments
-x-templates:
-  '{Environment-URL}':
-    $ref: '#/x-interfaces/Environment'
-  '{Environment-URL}/deployments':
-    $ref: '#/x-interfaces/Environment.deployments'
-  '{Environment-URL}/deployments/{name}':
-    parameters:
-    - in: path
-      name: name
-      required: true
-      type: string
-    <<: *Deployment
-  '{Shipyard-URL}':
-    $ref: '#/x-interfaces/Shipyard'
-  '{Shipyard-URL}/environments':
-    $ref: '#/x-interfaces/Shipyard.environments'
 paths:
   /:
-    $ref: '#/x-templates/{Shipyard-URL}'
+    $ref: '#/x-interfaces/Shipyard'
   /environments:
-    $ref: '#/x-templates/{Shipyard-URL}~1environments'
+    $ref: '#/x-interfaces/Shipyard.environments'
   /environments/{sharingSetName-envName}:
-    x-description: '*** This path is not part of the API - it is an implementation-private
-      extension'
+    x-description: We do not guarantee that the URL of an environment will always
+      have this format
     parameters:
-    - description: This parameter is a private part of the implementation. It is not
-        part of the API
+    - description: We do not guarantee that the variable in the URL of an environment
+        will always have this format
       in: path
       name: sharingSetName-envName
       required: true
       type: string
     <<: *Environment
   /environments/{sharingSetName-envName}/deployments:
-    x-description: '*** This path is not part of the API - it is an implementation-private
-      extension'
+    x-description: We do not guarantee that the URL of an environment will always
+      have this format
     parameters:
-    - description: This parameter is a private part of the implementation. It is not
-        part of the API
+    - description: We do not guarantee that the variable in the URL of an environment
+        will always have this format
       in: path
       name: sharingSetName-envName
       required: true
       type: string
     <<: *Environment-deployments
   /environments/{sharingSetName-envName}/deployments/{name}:
-    x-description: '*** This path is not part of the API - it is an implementation-private
-      extension'
+    x-description: We do not guarantee that the URL of an environment will always
+      have this format
     parameters:
-    - description: This parameter is a private part of the implementation. It is not
-        part of the API
+    - description: We do not guarantee that the variable in the URL of an environment
+        will always have this format
       in: path
       name: sharingSetName-envName
       required: true

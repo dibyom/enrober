@@ -58,7 +58,12 @@ entities:
     queryPaths: 
     - deployments 
     - deployments;{name}
-    permalinkTemplate: /environments/{sharingSetName-envName} 
+    permalinkTemplate: 
+      template: /environments/{sharingSetName-envName}
+      description: We do not guarantee that the URL of an environment will always have this format
+      variables:
+        sharingSetName-envName:
+          description: We do not guarantee that the variable in the URL of an environment will always have this format
   Deployment:
     properties:
       isA:
