@@ -54,6 +54,7 @@ x-interfaces:
       - description: The subset of properties of the Deployment being updated
         in: body
         name: body
+        required: true
         schema:
           $ref: '#/definitions/Deployment'
       responses:
@@ -189,6 +190,7 @@ x-interfaces:
       - description: The subset of properties of the Environment being updated
         in: body
         name: body
+        required: true
         schema:
           $ref: '#/definitions/Environment'
       responses:
@@ -321,6 +323,7 @@ x-interfaces:
       - description: The representation of the new Deployment being created
         in: body
         name: body
+        required: true
         schema:
           $ref: '#/definitions/Deployment'
       - description: The media type of the body
@@ -458,6 +461,7 @@ x-interfaces:
       - description: The representation of the new Environment being created
         in: body
         name: body
+        required: true
         schema:
           $ref: '#/definitions/Environment'
       - description: The media type of the body
