@@ -683,10 +683,11 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		tempPTS = tempJSON.PTS
 	}
 
-	//TODO: Need to do a check to make sure this is false for all containers
 	if allowPrivilegedContainers == false {
 		for _, val := range tempPTS.Spec.Containers {
-			val.SecurityContext.Privileged = func() *bool { b := false; return &b }()
+			if val.SecurityContext != nil {
+				val.SecurityContext.Privileged = func() *bool { b := false; return &b }()
+			}
 		}
 	}
 
