@@ -30,7 +30,7 @@ Please note that this allows for insecure communication with your kubernetes clu
 A prebuilt docker image is available with:
  
 ```sh
-docker pull thirtyx/enrober:v0.1.2
+docker pull thirtyx/enrober:v0.1.4
 ```
 
 To deploy the server as a docker container on a kubernetes cluster you should use the provided `deploy-base.yaml` file. Running `kubectl create -f deploy-base.yaml` will pull the image from dockerhub and deploy it to the default namespace.
@@ -81,9 +81,9 @@ For pods to be properly routed by the [k8s-pods-ingress](https://github.com/30x/
 
 > This assumes you are running the server locally, it is accessible at localhost:9000, and your kubernetes cluster is exposed with `kubectl proxy --port=8080`
 
-####Create a new environment:
+**Note:** All API calls require a valid JWT to be passed into an authorization header. For these examples we are using an empty JSON object that has been base64 encoded. 
 
-**Note:** Creating and modifying an environment require a valid JWT to be passed into an authorization header. For this example we are using an empty JSON object that has been base64 encoded.
+####Create a new environment:
 
 ```sh
 curl -X POST -H "Authorization: Bearer e30.e30.e30" -d '{
@@ -102,8 +102,6 @@ The value of each of these keys-value pairs will a 256-bit base64 encoded random
 
 
 ###Update the environment
-
-**Note:** Creating and modifying an environment require a valid JWT to be passed into an authorization header. For this example we are using an empty JSON object that has been base64 encoded.
 
 ```sh
 curl -X PATCH -H "Authorization: Bearer e30.e30.e30" -d '{
@@ -176,7 +174,6 @@ This will create a deployment that will guarantee a single replica of a pod cons
 	
 ```sh
 curl -X PATCH -H "Authorization: Bearer e30.e30.e30" -d '{
-	"deploymentName": "dep1",
 	"replicas": 3,
 }' \
 "localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1/deployments/dep1"
