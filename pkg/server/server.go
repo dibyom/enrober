@@ -77,6 +77,7 @@ var validHostnameRegex = regexp.MustCompile(`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-
 
 //Global ECR Pull Secrets
 var lookForECRSecret bool
+var ecrSecretName string
 
 //Global Privileged container flag
 var allowPrivilegedContainers bool
@@ -105,11 +106,23 @@ func Init(clientConfig restclient.Config) error {
 		client = *tempClient
 	}
 
-	//Set global ECR secret flag
-	if os.Getenv("ECR_SECRET") == "true" {
-		lookForECRSecret = true
+	//Not for testing
+	if os.Getenv("DEPLOY_STATE") == "PROD" {
+		//Set global ECR secret flag
+		if os.Getenv("ECR_SECRET") == "true" {
+			lookForECRSecret = true
+		} else {
+			lookForECRSecret = false
+		}
 	} else {
 		lookForECRSecret = false
+	}
+
+	//Set name of ECR Secret to look for
+	if os.Getenv("ECR_SECRET_NAME") != "" {
+		ecrSecretName = os.Getenv("ECR_SECRET_NAME")
+	} else {
+		ecrSecretName = "shipyard-pull-secret"
 	}
 
 	//Set privileged container flag
@@ -347,9 +360,8 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	//Print to console for logging
 	fmt.Printf("Created Secret: %v\n", secret.GetName())
 
-	//FIXME: Hardcoding secret copying for now
 	if lookForECRSecret {
-		getPullSecret, err := client.Secrets("apigee").Get("shipyard-pull-secret")
+		getPullSecret, err := client.Secrets("apigee").Get(ecrSecretName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			fmt.Printf("Error getting Image Pull Secret: %v\n", err)
@@ -357,7 +369,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		//Blank out all the metadata
 		getPullSecret.ObjectMeta = api.ObjectMeta{}
 		//Have to set the name
-		getPullSecret.SetName("shipyard-pull-secret")
+		getPullSecret.SetName(ecrSecretName)
 		newPullSecret, err := client.Secrets(pathVars["environmentGroupID"] + "-" + tempJSON.EnvironmentName).Create(getPullSecret)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -831,7 +843,7 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("No PTS\n")
 		if tempJSON.PtsURL == "" {
 			fmt.Printf("No ptsURL\n")
-			//No URL either so error
+			//No URL either
 			prevDep, err := client.Deployments(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Get(pathVars["deployment"])
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -903,6 +915,9 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	if tempJSON.PublicHosts != nil {
 		getDep.Spec.Template.Annotations["publicHosts"] = *tempJSON.PublicHosts
 	}
+
+	//Add routable label
+	getDep.Spec.Template.Labels["routable"] = "true"
 
 	dep, err := client.Deployments(pathVars["environmentGroupID"] + "-" + pathVars["environment"]).Update(getDep)
 	if err != nil {
