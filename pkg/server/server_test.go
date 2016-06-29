@@ -109,7 +109,7 @@ var _ = Describe("Server Test", func() {
 				"publicHosts": "deploy.k8s.public",
 				"privateHosts": "deploy.k8s.private",
     			"replicas": 1,
-    			"ptsURL": "https://api.myjson.com/bins/2g3im",
+    			"ptsURL": "https://api.myjson.com/bins/3bfpd",
 				"envVars": [{
 					"name": "test1",
 					"value": "test3"
@@ -139,7 +139,7 @@ var _ = Describe("Server Test", func() {
 
 			jsonStr := []byte(`{
 				"replicas": 3,
-				"ptsURL": "https://api.myjson.com/bins/3p3vy",
+				"ptsURL": "https://api.myjson.com/bins/3sspd",
 				"envVars": [{
 					"name": "test1",
 					"value": "test3"
@@ -176,7 +176,7 @@ var _ = Describe("Server Test", func() {
 					"metadata": {
 						"name": "testpod2",
 						"labels": {
-							"app": "web2"
+							"component": "web2"
 						},
 						"annotations": {
 							"publicPaths": "80:/ 90:/2",
@@ -242,7 +242,7 @@ var _ = Describe("Server Test", func() {
 					"metadata": {
 						"name": "testpod2",
 						"labels": {
-							"app": "web2"
+							"component": "web2"
 						},
 						"annotations": {
 							"publicPaths": "80:/ 100:/2",

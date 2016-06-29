@@ -768,7 +768,7 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 			Replicas: tempJSON.Replicas,
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": tempPTS.Labels["app"],
+					"component": tempPTS.Labels["component"],
 				},
 			},
 			Template: *tempPTS,
