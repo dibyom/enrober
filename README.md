@@ -30,7 +30,7 @@ Please note that this allows for insecure communication with your kubernetes clu
 A prebuilt docker image is available with:
  
 ```sh
-docker pull thirtyx/enrober:v0.1.5
+docker pull thirtyx/enrober:v0.1.9
 ```
 
 To deploy the server as a docker container on a kubernetes cluster you should use the provided `deploy-base.yaml` file. Running `kubectl create -f deploy-base.yaml` will pull the image from dockerhub and deploy it to the default namespace.
@@ -159,7 +159,15 @@ curl -X POST -H "Authorization: Bearer e30.e30.e30" -d '{
 				}]
 			}]
 		}
-	}
+	},
+    "envVars": [{
+        "name": "test1",
+        "value": "test3"
+    },
+    {
+        "name": "test2",
+        "value": "test4"
+    }] 
 }' \
 "localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1/deployments"
 ```
@@ -168,6 +176,11 @@ This will create a deployment that will guarantee a single replica of a pod cons
 
 - An nginx container serving on port 80
 - A hello world container serving on port 90
+
+The deployed pod will have also two environment variables:
+
+- test1=test3
+- test2=test4
 
 
 ### Update deployment
@@ -181,6 +194,7 @@ curl -X PATCH -H "Authorization: Bearer e30.e30.e30" -d '{
 
 This will modify the previous deployment to now guarantee 3 replicas of the pod.
 
+> Note that if you update a deployment without passing in the `"replicas"` parameter it will default to 0 replicas.
 
 ###Delete deployment
 

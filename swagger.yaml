@@ -251,6 +251,16 @@ definitions:
       pts:
         type: object
         description: Pod template spec to create
+      envVars:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            value:
+              type: string
+          
           
         
   deployment_patch:
