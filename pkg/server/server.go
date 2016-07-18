@@ -64,54 +64,16 @@ func Init(clientConfig restclient.Config) error {
 func NewServer() (server *Server) {
 	router := mux.NewRouter()
 
-	sub := router.PathPrefix("/beeswax/deploy/api/v1").Subrouter()
-
-	sub.Path("/").Methods("GET").HandlerFunc(getShipyard)
-	// sub.Path("/").Methods("HEAD").HandlerFunc(headShipyard)
-	// sub.Path("/").Methods("OPTIONS").HandlerFunc(optionsShipyard)
-
-	sub.Path("/environments").Methods("POST").HandlerFunc(postEnvironments)
-	// sub.Path("/environments").Methods("OPTIONS").HandlerFunc(optionsEnvironments)
-
-	sub.Path("/environments/{sharingSetName-envName}").Methods("GET").HandlerFunc(getSharingEnv)
-	sub.Path("/environments/{sharingSetName-envName}").Methods("PATCH").HandlerFunc(patchSharingEnv)
-	sub.Path("/environments/{sharingSetName-envName}").Methods("DELETE").HandlerFunc(deleteSharingEnv)
-	// sub.Path("/environments/{sharingSetName-envName}").Methods("HEAD").HandlerFunc(headSharingEnv)
-	// sub.Path("/environments/{sharingSetName-envName}").Methods("OPTIONS").HandlerFunc(optionsSharingEnv)
-
-	sub.Path("/environments/{sharingSetName-envName}/deployments").Methods("GET").HandlerFunc(getDeployments)
-	sub.Path("/environments/{sharingSetName-envName}/deployments").Methods("POST").HandlerFunc(postDeployments)
-	// sub.Path("/environments/{sharingSetName-envName}/deployments").Methods("HEAD").HandlerFunc(headDeployments)
-	// sub.Path("/environments/{sharingSetName-envName}/deployments").Methods("OPTIONS").HandlerFunc(optionsDeployments)
-
-	sub.Path("/environments/{sharingSetName-envName}/deployments/{name}").Methods("GET").HandlerFunc(getDeployment)
-	sub.Path("/environments/{sharingSetName-envName}/deployments/{name}").Methods("PATCH").HandlerFunc(patchDeployment)
-	sub.Path("/environments/{sharingSetName-envName}/deployments/{name}").Methods("DELETE").HandlerFunc(deleteDeployment)
-	// sub.Path("/environments/{sharingSetName-envName}/deployments/{name}").Methods("HEAD").HandlerFunc(headDeployment)
-	// sub.Path("/environments/{sharingSetName-envName}/deployments/{name}").Methods("OPTIONS").HandlerFunc(optionsDeployment)
-
-	//Old Paths
-	/*
-		sub.Path("/environmentGroups").Methods("GET").HandlerFunc(getEnvironmentGroups)
-
-		sub.Path("/environmentGroups/{environmentGroupID}").Methods("GET").HandlerFunc(getEnvironmentGroup)
-
-		sub.Path("/environmentGroups/{environmentGroupID}/environments").Methods("GET").HandlerFunc(getEnvironments)
-
-		sub.Path("/environmentGroups/{environmentGroupID}/environments").Methods("POST").HandlerFunc(createEnvironment)
-
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}").Methods("GET").HandlerFunc(getEnvironment)
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}").Methods("PATCH").HandlerFunc(updateEnvironment)
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}").Methods("DELETE").HandlerFunc(deleteEnvironment)
-
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}/deployments").Methods("GET").HandlerFunc(getDeployments)
-
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}/deployments").Methods("POST").HandlerFunc(createDeployment)
-
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}/deployments/{deployment}").Methods("GET").HandlerFunc(getDeployment)
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}/deployments/{deployment}").Methods("PATCH").HandlerFunc(updateDeployment)
-		sub.Path("/environmentGroups/{environmentGroupID}/environments/{environment}/deployments/{deployment}").Methods("DELETE").HandlerFunc(deleteDeployment)
-	*/
+	router.Path("/environments").Methods("POST").HandlerFunc(createEnvironment)
+	router.Path("/environments").Methods("GET").HandlerFunc(getEnvironments)
+	router.Path("/environments/{org-env}").Methods("GET").HandlerFunc(getEnvironment)
+	router.Path("/environments/{org-env}").Methods("PATCH").HandlerFunc(updateEnvironment)
+	router.Path("/environments/{org-env}").Methods("DELETE").HandlerFunc(deleteEnvironment)
+	router.Path("/environments/{org-env}/deployments").Methods("POST").HandlerFunc(getDeployment)
+	router.Path("/environments/{org-env}/deployments").Methods("GET").HandlerFunc(getDeployment)
+	router.Path("/environments/{org-env}/deployments/{deployment}").Methods("GET").HandlerFunc(getDeployment)
+	router.Path("/environments/{org-env}/deployments/{deployment}").Methods("PATCH").HandlerFunc(updateDeployment)
+	router.Path("/environments/{org-env}/deployments/{deployment}").Methods("DELETE").HandlerFunc(deleteDeployment)
 
 	server = &Server{
 		Router: router,
@@ -123,94 +85,6 @@ func NewServer() (server *Server) {
 func (server *Server) Start() error {
 	return http.ListenAndServe(":9000", server.Router)
 }
-
-//Route handlers
-
-// "/" endpoint
-//getShipyard
-func getShipyard(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-// func headShipyard(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// func optionsShipyard(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// "/environments" endpoint
-
-func postEnvironments(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-// func optionsEnvironments(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// "/environments/{sharingSetName-envName}" endpoint
-
-func getSharingEnv(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-func patchSharingEnv(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-func deleteSharingEnv(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-// func headSharingEnv(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// func optionsSharingEnv(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// "//environments/{sharingSetName-envName}/deployments" endpoint
-
-func getDeployments(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-func postDeployments(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-// func headDeployments(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// func optionsDeployments(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// /environments/{sharingSetName-envName}/deployments/{name}" endpoint
-
-func getDeployment(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-func patchDeployment(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-func deleteDeployment(w http.ResponseWriter, r *http.Request) {
-	//TODO:
-}
-
-// func headDeployment(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
-
-// func optionsDeployment(w http.ResponseWriter, r *http.Request) {
-// 	//TODO:
-// }
 
 //getEnvironments returns a list of all environments under a specific environmentGroupID
 func getEnvironments(w http.ResponseWriter, r *http.Request) {
