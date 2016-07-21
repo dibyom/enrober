@@ -591,7 +591,7 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
 
 	if os.Getenv("DEPLOY_STATE") == "PROD" {
-		if !helper.ValidAdmin(pathVars["environmentGroupID"], w, r) {
+		if !helper.ValidAdmin(pathVars["org"], w, r) {
 			//Errors should be returned from function
 			return
 		}
@@ -787,7 +787,7 @@ func getDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
 
 	if os.Getenv("DEPLOY_STATE") == "PROD" {
-		if !helper.ValidAdmin(pathVars["environmentGroupID"], w, r) {
+		if !helper.ValidAdmin(pathVars["org"], w, r) {
 			//Errors should be returned from function
 			return
 		}
@@ -819,7 +819,7 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
 
 	if os.Getenv("DEPLOY_STATE") == "PROD" {
-		if !helper.ValidAdmin(pathVars["environmentGroupID"], w, r) {
+		if !helper.ValidAdmin(pathVars["org"], w, r) {
 			//Errors should be returned from function
 			return
 		}
@@ -985,7 +985,7 @@ func deleteDeployment(w http.ResponseWriter, r *http.Request) {
 	pathVars := mux.Vars(r)
 
 	if os.Getenv("DEPLOY_STATE") == "PROD" {
-		if !helper.ValidAdmin(pathVars["environmentGroupID"], w, r) {
+		if !helper.ValidAdmin(pathVars["org"], w, r) {
 			//Errors should be returned from function
 			return
 		}
