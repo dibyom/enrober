@@ -380,7 +380,7 @@ func getEnvironment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var jsResponse environmentResponse
-	jsResponse.Name = getNs.Labels["envName"]
+	jsResponse.Name = getNs.Name
 	jsResponse.PrivateSecret = getSecret.Data["private-api-key"]
 	jsResponse.PublicSecret = getSecret.Data["public-api-key"]
 	jsResponse.HostNames = strings.Split(getNs.Annotations["hostNames"], " ")
