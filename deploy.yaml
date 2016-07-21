@@ -8,23 +8,25 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      name: enrober
+      component: enrober
   template:
     metadata:
       labels:
-        name: enrober
+        component: enrober
         routable: "true"
       annotations:
+        projectcalico.org/policy: "allow tcp from cidr 192.168.0.0/16; allow tcp from cidr 10.129.0.0/16"
         publicHosts: "test.k8s.local"
         publicPaths: "9000:/beeswax/deploy"
     spec:
       containers:
       - name: enrober
-        image: jbowen/enrober:v0.0.1
+        image: jbowen/enrober:v0.1.9
         env:
           - name: DEPLOY_STATE
             value: "PROD"
+          - name: ECR_SECRET
+            value: "false"
         ports:
           - containerPort: 9000
-        imagePullPolicy: Always
-      serviceAccount: admin
+
