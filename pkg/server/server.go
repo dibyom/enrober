@@ -10,7 +10,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -24,7 +26,7 @@ import (
 
 //Server struct
 type Server struct {
-	Router *mux.Router
+	Router http.Handler
 }
 
 //Global Kubernetes Client
@@ -112,8 +114,10 @@ func NewServer() (server *Server) {
 	router.Path("/environments/{org}-{env}/deployments/{deployment}").Methods("PATCH").HandlerFunc(updateDeployment)
 	router.Path("/environments/{org}-{env}/deployments/{deployment}").Methods("DELETE").HandlerFunc(deleteDeployment)
 
+	loggedRouter := handlers.CombinedLoggingHandler(os.Stdout, router)
+
 	server = &Server{
-		Router: router,
+		Router: loggedRouter,
 	}
 	return server
 }
@@ -129,7 +133,7 @@ func getEnvironments(w http.ResponseWriter, r *http.Request) {
 	nsList, err := client.Namespaces().List(api.ListOptions{})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error in getEnvironments: %v\n", err)
+		helper.LogError.Printf("Error in getEnvironments: %v\n", err)
 		return
 	}
 
@@ -149,9 +153,7 @@ func getEnvironments(w http.ResponseWriter, r *http.Request) {
 
 		//For each namespace we have to do a get on the secrets in it
 		getSecret, err := client.Secrets(value.Name).Get("routing")
-		if err != nil {
-			fmt.Printf("Error: couldn't get secret from namespace: %v\n", err)
-		} else {
+		if err == nil {
 			//Only return namespaces with the relevant secrets present
 			tempEnv.PrivateSecret = getSecret.Data["private-api-key"]
 			tempEnv.PublicSecret = getSecret.Data["public-api-key"]
@@ -171,7 +173,7 @@ func getEnvironments(w http.ResponseWriter, r *http.Request) {
 	js, err := json.Marshal(envList)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling environment array: %v\n", err)
+		helper.LogError.Printf("Error marshalling environment array: %s\n", err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
@@ -179,8 +181,7 @@ func getEnvironments(w http.ResponseWriter, r *http.Request) {
 
 	//TODO: What do we want logging response to be?
 	for _, value := range nsList.Items {
-		//For debug/logging
-		fmt.Printf("Got namespace: %v\n", value.GetName())
+		helper.LogInfo.Printf("Got namespace: %s\n", value.GetName())
 	}
 }
 
@@ -193,14 +194,14 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&tempJSON)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error decoding JSON Body: %v\n", err)
+		helper.LogError.Printf("Error decoding JSON Body: %s\n", err)
 		return
 	}
 
 	//Make sure they passed a valid environment name of form {org}-{env}
 	if !envNameRegex.MatchString(tempJSON.EnvironmentName) {
 		http.Error(w, "Invalid environment name", http.StatusInternalServerError)
-		fmt.Printf("Not a valid environment name\n")
+		helper.LogError.Printf("Not a valid environment name: %s\n", tempJSON.EnvironmentName)
 		return
 	}
 
@@ -227,7 +228,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		if !(validIP || validHost) {
 			//Regex didn't match
 			http.Error(w, "Invalid Hostname", http.StatusInternalServerError)
-			fmt.Printf("Not a valid hostname: %v\n", value)
+			helper.LogError.Printf("Not a valid hostname: %s\n", value)
 			return
 		}
 		if index == 0 {
@@ -243,8 +244,8 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		//Get list of all namespace and loop through each of their "validHosts" annotation looking for strings matching our value
 		nsList, err := client.Namespaces().List(api.ListOptions{})
 		if err != nil {
-			http.Error(w, "", http.StatusInternalServerError)
-			fmt.Printf("Error in getting nsList in createEnvironment: %v\n", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			helper.LogError.Printf("Error in getting nsList in createEnvironment: %s\n", err)
 			return
 		}
 
@@ -255,7 +256,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(val, value) {
 					//Duplicate HostNames
 					http.Error(w, "Duplicate Hostname", http.StatusInternalServerError)
-					fmt.Printf("Duplicate Hostname: %v\n", value)
+					helper.LogError.Printf("Duplicate Hostname: %s\n", value)
 					return
 				}
 			}
@@ -281,11 +282,11 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	createdNs, err := client.Namespaces().Create(nsObject)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error in createEnvironment: %v\n", err)
+		helper.LogError.Printf("Error in createEnvironment: %s\n", err)
 		return
 	}
 	//Print to console for logging
-	fmt.Printf("Created Namespace: %v\n", createdNs.GetName())
+	helper.LogInfo.Printf("Created Namespace: %s\n", createdNs.GetName())
 
 	tempSecret := api.Secret{
 		ObjectMeta: api.ObjectMeta{
@@ -299,8 +300,8 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	privateKey, err := helper.GenerateRandomString(32)
 	publicKey, err := helper.GenerateRandomString(32)
 	if err != nil {
-		fmt.Printf("Error generating random string: %v\n", err)
-		http.Error(w, "", http.StatusInternalServerError)
+		helper.LogError.Printf("Error generating random string: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	tempSecret.Data["public-api-key"] = []byte(publicKey)
 	tempSecret.Data["private-api-key"] = []byte(privateKey)
@@ -309,17 +310,17 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	secret, err := client.Secrets(tempJSON.EnvironmentName).Create(&tempSecret)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error creating secret: %v\n", err)
+		helper.LogError.Printf("Error creating secret: %s\n", err)
 	}
 	//Print to console for logging
-	fmt.Printf("Created Secret: %v\n", secret.GetName())
+	helper.LogInfo.Printf("Created Secret: %s\n", secret.GetName())
 
 	//TODO: Should be configurable
 	if lookForECRSecret {
 		getPullSecret, err := client.Secrets("apigee").Get(ecrSecretName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error getting Image Pull Secret: %v\n", err)
+			helper.LogError.Printf("Error getting Image Pull Secret: %s\n", err)
 		}
 		//Blank out all the metadata
 		getPullSecret.ObjectMeta = api.ObjectMeta{}
@@ -328,9 +329,9 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		newPullSecret, err := client.Secrets(tempJSON.EnvironmentName).Create(getPullSecret)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error creating new Image Pull Secret: %v\n", err)
+			helper.LogError.Printf("Error creating new Image Pull Secret: %s\n", err)
 		}
-		fmt.Printf("New Pull Secret: %v\n", newPullSecret.GetName())
+		helper.LogInfo.Printf("New Pull Secret: %v\n", newPullSecret.GetName())
 	}
 
 	var jsResponse environmentResponse
@@ -342,7 +343,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 	js, err := json.Marshal(jsResponse)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling response JSON: %v\n", err)
+		helper.LogError.Printf("Error marshalling response JSON: %s\n", err)
 		return
 	}
 
@@ -368,14 +369,14 @@ func getEnvironment(w http.ResponseWriter, r *http.Request) {
 	getNs, err := client.Namespaces().Get(pathVars["org"] + "-" + pathVars["env"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error getting existing Environment: %v\n", err)
+		helper.LogError.Printf("Error getting existing Environment: %v\n", err)
 		return
 	}
 
 	getSecret, err := client.Secrets(pathVars["org"] + "-" + pathVars["env"]).Get("routing")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error getting existing Secret: %v\n", err)
+		helper.LogError.Printf("Error getting existing Secret: %v\n", err)
 		return
 	}
 
@@ -388,7 +389,7 @@ func getEnvironment(w http.ResponseWriter, r *http.Request) {
 	js, err := json.Marshal(jsResponse)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling response JSON: %v\n", err)
+		helper.LogError.Printf("Error marshalling response JSON: %v\n", err)
 		return
 	}
 
@@ -397,8 +398,8 @@ func getEnvironment(w http.ResponseWriter, r *http.Request) {
 	w.Write(js)
 
 	//TODO: What do we want the logging response to be
-	fmt.Printf("Got Namespace: %v\n", getNs.GetName())
-	fmt.Printf("Got Secret: %v\n", getSecret.GetName())
+	helper.LogInfo.Printf("Got Namespace: %s\n", getNs.GetName())
+	helper.LogInfo.Printf("Got Secret: %s\n", getSecret.GetName())
 }
 
 func updateEnvironment(w http.ResponseWriter, r *http.Request) {
@@ -414,16 +415,18 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 	//Need to get the existing environment
 	getNs, err := client.Namespaces().Get(pathVars["org"] + "-" + pathVars["env"])
 	if err != nil {
-		fmt.Printf("Error: Namespace doesn't exist\n")
-		http.Error(w, "", http.StatusNotFound)
+		errorMessage := fmt.Sprintf("Namespace %s doesn't exist\n", pathVars["org"]+"-"+pathVars["env"])
+		helper.LogError.Printf(errorMessage)
+		http.Error(w, errorMessage, http.StatusNotFound)
 		return
 	}
 
 	//Looks like we have to do a get on the existing secrets in the namespace to print them out
 	getSecret, err := client.Secrets(pathVars["org"] + "-" + pathVars["env"]).Get("routing")
 	if err != nil {
-		fmt.Printf("Error: Failed to get existing secrets\n")
-		http.Error(w, "", http.StatusInternalServerError)
+		errorMessage := fmt.Sprintf("Failed to get existing routing secret on %s namespace\n", pathVars["org"]+"-"+pathVars["env"])
+		helper.LogError.Printf(errorMessage)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
 		return
 	}
 
@@ -436,8 +439,9 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 	var tempJSON environmentPatch
 	err = decoder.Decode(&tempJSON)
 	if err != nil {
-		fmt.Printf("Error decoding JSON Body: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorMessage := fmt.Sprintf("Error decoding JSON Body: %s\n", err)
+		helper.LogError.Printf(errorMessage)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
 		return
 	}
 
@@ -453,7 +457,7 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 		if !(validIP || validHost) {
 			//Regex didn't match
 			http.Error(w, "Invalid Hostname", http.StatusInternalServerError)
-			fmt.Printf("Error: Not a valid hostname: %v\n", value)
+			helper.LogError.Printf("Not a valid hostname: %s\n", value)
 			return
 		}
 		if index == 0 {
@@ -466,7 +470,7 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 	//Can do a quick optimization to just check if the new hostNames are the same as the old
 	//if they are we can just give a 200 back without doing anything
 	if bytes.Equal(hostsList.Bytes(), []byte(getNs.Annotations["hostNames"])) {
-		fmt.Printf("No changes to hostnames so just returning")
+		helper.LogInfo.Printf("Nothing to be updated\n")
 		return
 	}
 
@@ -482,8 +486,7 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 		nsList, err := client.Namespaces().List(api.ListOptions{})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error in getting nsList in updateEnvironment: %v\n", err)
-			fmt.Fprintf(w, "%v\n", err)
+			helper.LogError.Printf("Error in getting nsList in updateEnvironment: %s\n", err)
 			return
 		}
 
@@ -495,8 +498,9 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 					// Ignore duplicate hostNames on the namespace we are updating
 					if !(ns.GetName() == getNs.GetName()) {
 						//Duplicate HostNames
-						http.Error(w, "Duplicate Hostname", http.StatusInternalServerError)
-						fmt.Printf("Duplicate Hostname: %v\n", value)
+						errorMessage := fmt.Sprintf("Duplicate Hostname: %s\n", value)
+						http.Error(w, errorMessage, http.StatusInternalServerError)
+						helper.LogError.Printf(errorMessage)
 						return
 					}
 
@@ -509,11 +513,12 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 
 	updateNS, err := client.Namespaces().Update(getNs)
 	if err != nil {
-		fmt.Printf("Error: Failed to update existing namespace\n")
-		http.Error(w, "", http.StatusInternalServerError)
+		errorMessage := fmt.Sprintf("Failed to update existing namespace '%s'\n", getNs)
+		helper.LogError.Printf(errorMessage)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf("Updated hostNames: %v\n", updateNS.Annotations["hostNames"])
+	helper.LogInfo.Printf("Updated hostNames: %s\n", updateNS.Annotations["hostNames"])
 
 	var jsResponse environmentResponse
 	jsResponse.Name = pathVars["environment"]
@@ -523,8 +528,9 @@ func updateEnvironment(w http.ResponseWriter, r *http.Request) {
 
 	js, err := json.Marshal(jsResponse)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling namespace: %v\n", err)
+		errorMessage := fmt.Sprintf("Couldn't marshall namespace: %s\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
@@ -545,15 +551,15 @@ func deleteEnvironment(w http.ResponseWriter, r *http.Request) {
 
 	err := client.Namespaces().Delete(pathVars["org"] + "-" + pathVars["env"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error in deleteEnvironment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error in deleteEnvironment: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 	w.WriteHeader(204)
 
 	//Print to stdout for logging
-	fmt.Printf("Deleted Namespace: %v\n", pathVars["org"]+"-"+pathVars["env"])
-
+	helper.LogInfo.Printf("Deleted Namespace: %s\n", pathVars["org"]+"-"+pathVars["env"])
 }
 
 //getDeployments returns a list of all deployments matching the given environmentGroupID and environmentName
@@ -569,20 +575,22 @@ func getDeployments(w http.ResponseWriter, r *http.Request) {
 		LabelSelector: labels.Everything(),
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error retrieving deployment list: %v\n", err)
+		errorMessage := fmt.Sprintf("Error retrieving deployment list: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 	js, err := json.Marshal(depList)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling deployment list: %v\n", err)
+		errorMessage := fmt.Sprintf("Error marshalling deployment list: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(js)
 	for _, value := range depList.Items {
-		fmt.Printf("Got Deployment: %v\n", value.GetName())
+		helper.LogInfo.Printf("Got Deployment: %s\n", value.GetName())
 	}
 }
 
@@ -602,14 +610,16 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 	var tempJSON deploymentPost
 	err := decoder.Decode(&tempJSON)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error decoding JSON Body: %v\n", err)
+		errorMessage := fmt.Sprintf("Error decoding JSON Body: %s\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
 	if tempJSON.PublicHosts == nil && tempJSON.PrivateHosts == nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		fmt.Printf("No privateHosts or publicHosts given\n")
+		errorMessage := fmt.Sprintf("No privateHosts or publicHosts given\n")
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
@@ -620,8 +630,9 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		//No PTS so check ptsURL
 		if tempJSON.PtsURL == "" {
 			//No URL either so error
-			http.Error(w, "", http.StatusInternalServerError)
-			fmt.Printf("No ptsURL or PTS given\n")
+			errorMessage := fmt.Sprintf("No ptsURL or PTS given\n")
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
 			return
 		}
 		//Get from URL
@@ -637,35 +648,40 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		// then this call will need to pass in that key.
 		urlJSON, err := httpClient.Do(req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error retrieving pod template spec: %v\n", err)
+			errorMessage := fmt.Sprintf("Error retrieving pod template spec: %s\n", err)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
 			return
 		}
 		defer urlJSON.Body.Close()
 
 		if urlJSON.StatusCode != 200 {
-			fmt.Printf("Expected 200 got: %v\n", urlJSON.StatusCode)
-			http.Error(w, "", http.StatusInternalServerError)
+			errorMessage := fmt.Sprintf("Expected 200 from ptsURL got: %v\n", urlJSON.StatusCode)
+			helper.LogError.Printf(errorMessage)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
 			return
 		}
 
 		err = json.NewDecoder(urlJSON.Body).Decode(tempPTS)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error decoding PTS JSON Body: %v\n", err)
+			errorMessage := fmt.Sprintf("Error decoding PTS JSON Body: %s\n", err)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
 			return
 		}
 
 		if os.Getenv("DEPLOY_STATE") == "PROD" {
 			u, err := url.Parse(tempJSON.PtsURL)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				fmt.Printf("Error parsing ptsURL")
+				errorMessage := fmt.Sprintf("Error parsing ptsURL: %s\n", err)
+				http.Error(w, errorMessage, http.StatusInternalServerError)
+				helper.LogError.Printf(errorMessage)
 				return
 			}
 			if u.Host != r.Host {
-				fmt.Printf("Attempting to use PTS from unauthorized host: %v, expected: %v\n", u.Host, r.Host)
-				http.Error(w, "Attempting to use PTS from unauthorized host", http.StatusInternalServerError)
+				errorMessage := fmt.Sprintf("Attempting to use PTS from unauthorized host: %v, expected: %v\n", u.Host, r.Host)
+				helper.LogError.Printf(errorMessage)
+				http.Error(w, errorMessage, http.StatusInternalServerError)
 				return
 			}
 		}
@@ -754,32 +770,35 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		LabelSelector: labelSelector,
 	})
 	if len(depList.Items) != 0 {
-		fmt.Printf("LabelSelector " + labelSelector.String() + " already exists")
-		http.Error(w, "LabelSelector "+labelSelector.String()+" already exists", http.StatusInternalServerError)
+		errorMessage := fmt.Sprintf("LabelSelector " + labelSelector.String() + " already exists")
+		helper.LogError.Printf(errorMessage)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	//Create Deployment
 	dep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Create(&template)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error creating deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error creating deployment: %s\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 	js, err := json.Marshal(dep)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error marshalling deployment: %s\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 	}
 
 	//Create absolute path for Location header
-	url := "/beeswax/deploy/api/v1/environmentGroups/" + pathVars["environmentGroupID"] + "/environments/" + pathVars["environment"] + "/deployments/" + tempJSON.DeploymentName
+	url := "/environments/" + pathVars["org"] + "-" + pathVars["env"] + "/deployments/" + tempJSON.DeploymentName
 	w.Header().Add("Location", url)
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
 	w.Write(js)
 
-	fmt.Printf("Created Deployment: %v\n", dep.GetName())
+	helper.LogInfo.Printf("Created Deployment: %s\n", dep.GetName())
 }
 
 //getDeployment returns a deployment matching the given environmentGroupID, environmentName, and deploymentName
@@ -795,22 +814,23 @@ func getDeployment(w http.ResponseWriter, r *http.Request) {
 
 	getDep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Get(pathVars["deployment"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error retrieving deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error retrieving deployment: %s\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 	js, err := json.Marshal(getDep)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error marshalling deployment: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(js)
 
 	//TODO: What do we want logging message to be?
-	fmt.Printf("Got Deployment: %v\n", getDep.GetName())
-
+	helper.LogInfo.Printf("Got Deployment: %v\n", getDep.GetName())
 }
 
 //updateDeployment updates a deployment matching the given environmentGroupID, environmentName, and deploymentName
@@ -828,8 +848,9 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	//Get the old namespace first so we can fail quickly if it's not there
 	getDep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Get(pathVars["deployment"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		fmt.Printf("Error getting existing deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error getting existing deployment: %s\n", err)
+		http.Error(w, errorMessage, http.StatusNotFound)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 	//Decode passed JSON body
@@ -837,8 +858,9 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	var tempJSON deploymentPatch
 	err = decoder.Decode(&tempJSON)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error decoding JSON Body: %v\n", err)
+		errorMessage := fmt.Sprintf("Error decoding JSON Body: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
@@ -850,8 +872,9 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 			//No URL either
 			prevDep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Get(pathVars["deployment"])
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				fmt.Printf("No ptsURL or PTS given and failed to retrieve previous PTS: %v\n", err)
+				errorMessage := fmt.Sprintf("No ptsURL or PTS given and failed to retrieve previous PTS: %v\n", err)
+				http.Error(w, errorMessage, http.StatusInternalServerError)
+				helper.LogError.Printf(errorMessage)
 				return
 			}
 			tempPTS = &prevDep.Spec.Template
@@ -868,35 +891,40 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 			// then this call will need to pass in that key.
 			urlJSON, err := httpClient.Do(req)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				fmt.Printf("Error retrieving pod template spec: %v\n", err)
+				errorMessage := fmt.Sprintf("Error retrieving pod template spec: %s\n", err)
+				http.Error(w, errorMessage, http.StatusInternalServerError)
+				helper.LogError.Printf(errorMessage)
 				return
 			}
 			defer urlJSON.Body.Close()
 
 			if urlJSON.StatusCode != 200 {
-				fmt.Printf("Expected 200 got: %v\n", urlJSON.StatusCode)
-				http.Error(w, "", http.StatusInternalServerError)
+				errorMessage := fmt.Sprintf("Expected 200 got: %v\n", urlJSON.StatusCode)
+				helper.LogError.Printf(errorMessage)
+				http.Error(w, errorMessage, http.StatusInternalServerError)
 				return
 			}
 
 			err = json.NewDecoder(urlJSON.Body).Decode(tempPTS)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				fmt.Printf("Error decoding PTS JSON Body: %v\n", err)
+				errorMessage := fmt.Sprintf("Error decoding PTS JSON Body: %s\n", err)
+				http.Error(w, errorMessage, http.StatusInternalServerError)
+				helper.LogError.Printf(errorMessage)
 				return
 			}
 
 			if os.Getenv("DEPLOY_STATE") == "PROD" {
 				u, err := url.Parse(tempJSON.PtsURL)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					fmt.Printf("Error parsing ptsURL")
+					errorMessage := fmt.Sprintf("Error parsing ptsURL: %v\n", err)
+					http.Error(w, errorMessage, http.StatusInternalServerError)
+					helper.LogError.Printf(errorMessage)
 					return
 				}
 				if u.Host != r.Host {
-					fmt.Printf("Attempting to use PTS from unauthorized host: %v, expected: %v\n", u.Host, r.Host)
-					http.Error(w, "Attempting to use PTS from unauthorized host", http.StatusInternalServerError)
+					errorMessage := fmt.Sprintf("Attempting to use PTS from unauthorized host: %v, expected: %v\n", u.Host, r.Host)
+					helper.LogError.Printf(errorMessage)
+					http.Error(w, errorMessage, http.StatusInternalServerError)
 					return
 				}
 			}
@@ -964,20 +992,22 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 
 	dep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Update(getDep)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error updating deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error updating deployment: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
 	js, err := json.Marshal(dep)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error marshalling deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error marshalling deployment: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(js)
-	fmt.Printf("Updated Deployment: %v\n", dep.GetName())
+	helper.LogInfo.Printf("Updated Deployment: %s\n", dep.GetName())
 }
 
 //deleteDeployment deletes a deployment matching the given environmentGroupID, environmentName, and deploymentName
@@ -994,16 +1024,18 @@ func deleteDeployment(w http.ResponseWriter, r *http.Request) {
 	//Get the deployment object
 	dep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Get(pathVars["deployment"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error getting old deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error getting old deployment: %s\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
 	//Get the match label
 	selector, err := labels.Parse("component=" + dep.Labels["component"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error creating label selector: %v\n", err)
+		errorMessage := fmt.Sprintf("Error creating label selector: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
@@ -1012,8 +1044,9 @@ func deleteDeployment(w http.ResponseWriter, r *http.Request) {
 		LabelSelector: selector,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error getting replica set list: %v\n", err)
+		errorMessage := fmt.Sprintf("Error getting replica set list: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
 
@@ -1025,34 +1058,35 @@ func deleteDeployment(w http.ResponseWriter, r *http.Request) {
 	//Delete Deployment
 	err = client.Deployments(pathVars["org"]+"-"+pathVars["env"]).Delete(pathVars["deployment"], &api.DeleteOptions{})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fmt.Printf("Error deleting deployment: %v\n", err)
+		errorMessage := fmt.Sprintf("Error deleting deployment: %v\n", err)
+		http.Error(w, errorMessage, http.StatusInternalServerError)
+		helper.LogError.Printf(errorMessage)
 		return
 	}
-	fmt.Printf("Deleted Deployment: %v\n", pathVars["deployment"])
+	helper.LogInfo.Printf("Deleted Deployment: %v\n", pathVars["deployment"])
 
 	//Delete all Replica Sets that came up in the list
 	for _, value := range rsList.Items {
 		err = client.ReplicaSets(pathVars["org"]+"-"+pathVars["env"]).Delete(value.GetName(), &api.DeleteOptions{})
 		if err != nil {
-			fmt.Printf("Error deleting replica set: %v\n", err)
+			errorMessage := fmt.Sprintf("Error deleting replica set: %v\n", err)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
 			return
 		}
-		fmt.Printf("Deleted Replica Set: %v\n", value.GetName())
-
+		helper.LogInfo.Printf("Deleted Replica Set: %v\n", value.GetName())
 	}
 
 	//Delete all Pods that came up in the list
 	for _, value := range podList.Items {
 		err = client.Pods(pathVars["org"]+"-"+pathVars["env"]).Delete(value.GetName(), &api.DeleteOptions{})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fmt.Printf("Error deleting pod: %v\n", err)
+			errorMessage := fmt.Sprintf("Error deleting pod: %v\n", err)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
 			return
 		}
-		fmt.Printf("Deleted Pod: %v\n", value.GetName())
-
+		helper.LogInfo.Printf("Deleted Pod: %v\n", value.GetName())
 	}
-
 	w.WriteHeader(204)
 }
