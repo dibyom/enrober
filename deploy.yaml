@@ -15,13 +15,12 @@ spec:
         component: enrober
         routable: "true"
       annotations:
-        projectcalico.org/policy: "allow tcp from cidr 192.168.0.0/16; allow tcp from cidr 10.129.0.0/16"
         publicHosts: "test.k8s.local"
-        publicPaths: "9000:/beeswax/deploy"
+        publicPaths: "9000:/environments"
     spec:
       containers:
       - name: enrober
-        image: jbowen/enrober:v0.1.9
+        image: jbowen/enrober:v0.2.3
         env:
           - name: DEPLOY_STATE
             value: "PROD"

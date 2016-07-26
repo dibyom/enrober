@@ -5,7 +5,7 @@ This project consists of a an API server that functions as a wrapper around the 
 This project is closely related to other 30x projects:
 
 - [dev-setup](https://github.com/30x/Dev_Setup)
-- [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress)
+- [k8s-pods-ingress](https://github.com/30x/k8s-router)
 - [shipyard](https://github.com/30x/shipyard)
 
 ###Local Deployment
@@ -37,7 +37,7 @@ To deploy the server as a docker container on a kubernetes cluster you should us
 
 The server will be accesible at `<pod-ip>/`
 
-You can choose to expose the pod using the [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress). Make sure to modify the `deploy.yaml` file to match your ingress configuration. 
+You can choose to expose the pod using the [k8s-pods-ingress](https://github.com/30x/k8s-router). Make sure to modify the `deploy.yaml` file to match your ingress configuration. 
 
 Alternatively you can expose the server using a kubernetes service. Refer to the docs [here](http://kubernetes.io/docs/user-guide/services/).
 
@@ -53,7 +53,7 @@ A swagger.yaml file is provided that documents the API per the OpenAPI specifica
 
 ####Environments
 
-An environment consists of a kubernetes namespace and our specific secrets associated with it. Each environment comes with a `routing` secret that contains two key-value pairs, a `public-api-key` and a `private-api-key`. These are for use with the [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress) to allow for secure communication with pods from inside and outside of the kubernetes cluster.  
+An environment consists of a kubernetes namespace and our specific secrets associated with it. Each environment comes with a `routing` secret that contains two key-value pairs, a `public-api-key` and a `private-api-key`. These are for use with the [k8s-pods-ingress](https://github.com/30x/k8s-router) to allow for secure communication with pods from inside and outside of the kubernetes cluster.  
 
 
 ##Apigee Specific Annotations
@@ -64,17 +64,17 @@ When created environments can accept an array of valid host names to accept traf
 
 ####Deployments
 
-When created deployments can accept a `publicHosts` value, a `privateHosts` value or both. These values are for use with the [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress) and are the host name where the deployment can be reached. These values are stored as annotations on the deployed pods. 
+When created deployments can accept a `publicHosts` value, a `privateHosts` value or both. These values are for use with the [k8s-pods-ingress](https://github.com/30x/k8s-router) and are the host name where the deployment can be reached. These values are stored as annotations on the deployed pods. 
 
 ####Pod Template Specs
 
 When they are provided to the deployments endpoint pod template specs must have several Apigee specific labels and annotations.  
 
 **Labels:**
-For pods to be recognized by the [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress) they must have a label named `"routable"` with a value of `"true"`.
+For pods to be recognized by the [k8s-pods-ingress](https://github.com/30x/k8s-router) they must have a label named `"routable"` with a value of `"true"`.
 
 **Annotations:**
-For pods to be properly routed by the [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress) they must have a `"publicPaths"` and/or `"privatePaths"` annotation where the value is of the form `{PORT}:{PATH}`. You may have multiple space delimited `{PORT}:{PATH}` combinations on each annotation. 
+For pods to be properly routed by the [k8s-pods-ingress](https://github.com/30x/k8s-router) they must have a `"publicPaths"` and/or `"privatePaths"` annotation where the value is of the form `{PORT}:{PATH}`. You may have multiple space delimited `{PORT}:{PATH}` combinations on each annotation. 
  
 
 ##Usage
@@ -98,7 +98,7 @@ This will create a `org1-env1` namespace and a secret named `routing` with two k
 - public-api-key
 - private-api-key
 
-The value of each of these keys-value pairs will a 256-bit base64 encoded randomized string. These secrets are for use with [30x/k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress)
+The value of each of these keys-value pairs will a 256-bit base64 encoded randomized string. These secrets are for use with [30x/k8s-pods-ingress](https://github.com/30x/k8s-router)
 
 
 ###Update the environment
