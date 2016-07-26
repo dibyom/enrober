@@ -15,7 +15,7 @@ go build
 ./enrober
 ```
 
-The server will be accesible at `localhost:9000/beeswax/deploy/api/v1`
+The server will be accesible at `localhost:9000/`
 
 For the server to be able to communicate with your kubernetes cluster you must run:
 
