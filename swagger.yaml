@@ -6,13 +6,11 @@ info:
 
 paths:
       
-  /environmentGroups/{environmentGroupID}/environments:
+  /environments:
     get:
       description: Returns an array of all environments under a specific Environment Group ID 
       produces: 
       - application/json
-      parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
       responses:
         200:
           description: Successful response
@@ -29,7 +27,6 @@ paths:
     post:
       description: Creates an environment consisting of a kubernetes namespace and a secret. 
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
       - name: environment_post
         in: body
         description: environment JSON body object
@@ -55,14 +52,14 @@ paths:
         default:
           description: 5xx Errors
   
-  /environmentGroups/{environmentGroupID}/environments/{environment}:
+  /environments/{org}-{env}:
     get:
       description: Returns an environment consisting of a kubernetes namespace and a secret.
       produces: 
       - application/json
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       responses:
         200:
           description: Successful response
@@ -80,8 +77,8 @@ paths:
       produces: 
       - application/json
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       - name: environment_patch
         in: body
         description: environment JSON body object
@@ -111,8 +108,8 @@ paths:
       produces: 
       - application/json
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       responses:
         200:
           description: Successful response
@@ -123,14 +120,14 @@ paths:
         default:
           description: 5xx Errors
       
-  /environmentGroups/{environmentGroupID}/environments/{environment}/deployments:
+  //environments/{org}-{env}/deployments:
     get:
       description: Returns a list of all deployments in a given environment.
       produces: 
       - application/json
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       responses:
         200:
           description: Successful response
@@ -145,8 +142,8 @@ paths:
     post:
       description: Creates a deployment in the given environment.
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
         
       - name: deployment_body
         in: body
@@ -165,14 +162,14 @@ paths:
         default:
           description: 5xx Errors
 
-  /environmentGroups/{environmentGroupID}/environments/{environment}/deployments/{deployment}:
+  /environments/{org}-{env}/deployments/{deployment}:
     get:
       description: Returns a deployment matching the given Environment Group ID, Environment Name, and Deployment Name
       produces: 
       - application/json
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       - $ref: "#/parameters/deploymentParam"
       responses:
         200:
@@ -190,8 +187,8 @@ paths:
     patch:
       description: Updates a deployment matching the given Environment Group ID, Environment Name, and Deployment Name
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       - $ref: "#/parameters/deploymentParam"
       - name: deployment_body
         in: body
@@ -215,8 +212,8 @@ paths:
     delete:
       description: Deletes a deployment matching the given Environment Group ID, Environment Name, and Deployment Name
       parameters:
-      - $ref: "#/parameters/environmentGroupIDParam"
-      - $ref: "#/parameters/environmentParam"
+      - $ref: "#/parameters/orgParam"
+      - $ref: "#/parameters/envParam"
       - $ref: "#/parameters/deploymentParam"
       responses:
         200:
@@ -303,17 +300,17 @@ definitions:
 
 #Top Level Path Parameters
 parameters:
-  environmentGroupIDParam:
-    name: environmentGroupID
+  orgParam:
+    name: org
     in: path
-    description: environmentGroupID of environment
+    description: apigee organization
     required: true
     type: string
     
-  environmentParam:
-    name: environment
+  envParam:
+    name: env
     in: path
-    description: environment to place deployment in
+    description: apigee environment
     required: true
     type: string
   

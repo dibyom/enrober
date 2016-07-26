@@ -15,7 +15,7 @@ go build
 ./enrober
 ```
 
-The server will be accesible at `localhost:9000/beeswax/deploy/api/v1`
+The server will be accesible at `localhost:9000/`
 
 For the server to be able to communicate with your kubernetes cluster you must run:
 
@@ -30,12 +30,12 @@ Please note that this allows for insecure communication with your kubernetes clu
 A prebuilt docker image is available with:
  
 ```sh
-docker pull thirtyx/enrober:v0.1.9
+docker pull thirtyx/enrober:v0.2.3
 ```
 
 To deploy the server as a docker container on a kubernetes cluster you should use the provided `deploy-base.yaml` file. Running `kubectl create -f deploy-base.yaml` will pull the image from dockerhub and deploy it to the default namespace.
 
-The server will be accesible at `<pod-ip>/beeswax/deploy/api/v1`
+The server will be accesible at `<pod-ip>/`
 
 You can choose to expose the pod using the [k8s-pods-ingress](https://github.com/30x/k8s-pods-ingress). Make sure to modify the `deploy.yaml` file to match your ingress configuration. 
 
@@ -86,14 +86,14 @@ For pods to be properly routed by the [k8s-pods-ingress](https://github.com/30x/
 ####Create a new environment:
 
 ```sh
-curl -X POST -H "Authorization: Bearer e30.e30.e30" -d '{
-	"environmentName": "env1",
+curl -X POST -d '{
+	"environmentName": "org1-env1",
 	"hostNames": ["host1"]
 	}' \
-"localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments"
+"localhost:9000/environments"
 ```
 
-This will create a `group1-env1` namespace and a secret named `routing` with two key-value pairs:
+This will create a `org1-env1` namespace and a secret named `routing` with two key-value pairs:
 
 - public-api-key
 - private-api-key
@@ -104,10 +104,10 @@ The value of each of these keys-value pairs will a 256-bit base64 encoded random
 ###Update the environment
 
 ```sh
-curl -X PATCH -H "Authorization: Bearer e30.e30.e30" -d '{
+curl -X PATCH -d '{
 	"hostNames": ["host1", "host2"]
 	}' \
-"localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1"
+"localhost:9000/environments/org1-env1"
 ```
 
 This will modify the previously created environment's hostNames array to equal:
@@ -117,7 +117,7 @@ This will modify the previously created environment's hostNames array to equal:
 ### Create a new deployment from an inline Pod Template Spec
 
 ```sh
-curl -X POST -H "Authorization: Bearer e30.e30.e30" -d '{
+curl -X POST  -d '{
 	"deploymentName": "dep1",
     "publicHosts": "deploy.k8s.public",
     "privateHosts": "deploy.k8s.private",
@@ -169,7 +169,7 @@ curl -X POST -H "Authorization: Bearer e30.e30.e30" -d '{
         "value": "test4"
     }] 
 }' \
-"localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1/deployments"
+"localhost:9000/environments/org1-env1/deployments"
 ```
 
 This will create a deployment that will guarantee a single replica of a pod consisting of two containers: 
@@ -186,10 +186,10 @@ The deployed pod will have also two environment variables:
 ### Update deployment
 	
 ```sh
-curl -X PATCH -H "Authorization: Bearer e30.e30.e30" -d '{
+curl -X PATCH  -d '{
 	"replicas": 3,
 }' \
-"localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1/deployments/dep1"
+"localhost:9000/environments/org1-env1/deployments/dep1"
 ```
 
 This will modify the previous deployment to now guarantee 3 replicas of the pod.
@@ -199,8 +199,8 @@ This will modify the previous deployment to now guarantee 3 replicas of the pod.
 ###Delete deployment
 
 ```sh
-curl -X DELETE -H "Authorization: Bearer e30.e30.e30" \
-"localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1/deployments/dep1"
+curl -X DELETE  \
+"localhost:9000/environments/org1-env1/deployments/dep1"
 ```
 
 This will delete the previously created deployment and all related resources such as replica sets and pods. 
@@ -208,8 +208,8 @@ This will delete the previously created deployment and all related resources suc
 ###Delete environment
 
 ```sh
-curl -X DELETE -H "Authorization: Bearer e30.e30.e30" \
-"localhost:9000/beeswax/deploy/api/v1/environmentGroups/group1/environments/env1"
+curl -X DELETE \
+"localhost:9000/environments/org1-env1"
 ```
 
 This will delete the previously created environment. 
