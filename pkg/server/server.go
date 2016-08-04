@@ -662,6 +662,7 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		httpClient := &http.Client{}
 
 		req, err := http.NewRequest("GET", tempJSON.PtsURL, nil)
+		req.Header.Add("Authorization", r.Header.Get("Authorization"))
 		req.Header.Add("Content-Type", "application/json")
 
 		//TODO: In the future if we require a secret to access the PTS store
@@ -905,6 +906,7 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 			httpClient := &http.Client{}
 
 			req, err := http.NewRequest("GET", tempJSON.PtsURL, nil)
+			req.Header.Add("Authorization", r.Header.Get("Authorization"))
 			req.Header.Add("Content-Type", "application/json")
 
 			//TODO: In the future if we require a secret to access the PTS store

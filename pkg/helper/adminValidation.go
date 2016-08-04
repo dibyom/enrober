@@ -7,15 +7,15 @@ import (
 	"github.com/30x/authsdk"
 )
 
-//ValidAdmin checks if the user is an org admin for the namespace they are making a request in
-func ValidAdmin(namespace string, w http.ResponseWriter, r *http.Request) bool {
+//ValidAdmin checks if the user is an org admin for the organization they are making a request in
+func ValidAdmin(organization string, w http.ResponseWriter, r *http.Request) bool {
 	token, err := authsdk.NewJWTTokenFromRequest(r)
 	if err != nil {
 		fmt.Printf("Error getting JWT Token: %v\n", err)
 		http.Error(w, "Invalid Token", http.StatusUnauthorized) //401
 		return false
 	}
-	isAdmin, err := token.IsOrgAdmin(namespace)
+	isAdmin, err := token.IsOrgAdmin(organization)
 	if err != nil {
 		fmt.Printf("Error checking caller is an Org Admin: %v\n", err) //401
 		http.Error(w, "", http.StatusUnauthorized)
