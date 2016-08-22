@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -52,6 +53,12 @@ var (
 
 	//Namespace Isolation
 	isolateNamespace bool
+
+	shipyardHost          string
+	internalRouterHost    string
+	shipyardPrivateSecret string
+
+	apiRoutingKey string
 )
 
 //Init runs once
@@ -75,6 +82,16 @@ func Init(clientConfig restclient.Config) error {
 			return err
 		}
 		client = *tempClient
+	}
+
+	shipyardHost = os.Getenv("SHIPYARD_HOST")
+	internalRouterHost = os.Getenv("INTERNAL_ROUTER_HOST")
+	shipyardPrivateSecret = os.Getenv("SHIPYARD_PRIVATE_SECRET")
+
+	//Set default if we aren't given an alternate name
+	apiRoutingKey = os.Getenv("API_ROUTING_KEY")
+	if apiRoutingKey == "" {
+		apiRoutingKey = "X-ROUTING-API-KEY"
 	}
 
 	if os.Getenv("ISOLATE_NAMESPACE") == "false" {
@@ -663,16 +680,35 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		}
 		//Get from URL
 		//TODO: Duplicated code, could be moved to helper function
-		//Get JSON from url
 
 		httpClient := &http.Client{}
 
-		req, err := http.NewRequest("GET", tempJSON.PtsURL, nil)
+		ptsURL, err := url.Parse(tempJSON.PtsURL)
+		if err != nil {
+			errorMessage := fmt.Sprintf("Error parsing ptsURL\n")
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
+			return
+		}
+
+		internalRouterFlag := false
+
+		if ptsURL.Host == shipyardHost {
+			ptsURL.Host = internalRouterHost
+			ptsURL.Scheme = "http"
+			internalRouterFlag = true
+		}
+
+		req, err := http.NewRequest("GET", ptsURL.String(), nil)
+
+		if internalRouterFlag {
+			req.Host = shipyardHost
+			req.Header.Add("Host", shipyardHost)
+			req.Header.Add(apiRoutingKey, base64.StdEncoding.EncodeToString([]byte(shipyardPrivateSecret)))
+		}
 		req.Header.Add("Authorization", r.Header.Get("Authorization"))
 		req.Header.Add("Content-Type", "application/json")
 
-		//TODO: In the future if we require a secret to access the PTS store
-		// then this call will need to pass in that key.
 		urlJSON, err := httpClient.Do(req)
 		if err != nil {
 			errorMessage := fmt.Sprintf("Error retrieving pod template spec: %s\n", err)
@@ -908,15 +944,34 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 		} else {
 			//Get from URL
 			//TODO: Duplicated code, could be moved to helper function
-			//Get JSON from url
 			httpClient := &http.Client{}
 
-			req, err := http.NewRequest("GET", tempJSON.PtsURL, nil)
+			ptsURL, err := url.Parse(tempJSON.PtsURL)
+			if err != nil {
+				errorMessage := fmt.Sprintf("Error parsing ptsURL\n")
+				http.Error(w, errorMessage, http.StatusInternalServerError)
+				helper.LogError.Printf(errorMessage)
+				return
+			}
+
+			internalRouterFlag := false
+
+			if ptsURL.Host == shipyardHost {
+				ptsURL.Host = internalRouterHost
+				ptsURL.Scheme = "http"
+				internalRouterFlag = true
+			}
+
+			req, err := http.NewRequest("GET", ptsURL.String(), nil)
+
+			if internalRouterFlag {
+				req.Host = shipyardHost
+				req.Header.Add("Host", shipyardHost)
+				req.Header.Add(apiRoutingKey, base64.StdEncoding.EncodeToString([]byte(shipyardPrivateSecret)))
+			}
 			req.Header.Add("Authorization", r.Header.Get("Authorization"))
 			req.Header.Add("Content-Type", "application/json")
 
-			//TODO: In the future if we require a secret to access the PTS store
-			// then this call will need to pass in that key.
 			urlJSON, err := httpClient.Do(req)
 			if err != nil {
 				errorMessage := fmt.Sprintf("Error retrieving pod template spec: %s\n", err)
