@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/30x/enrober/pkg/server"
@@ -375,9 +376,14 @@ var _ = Describe("Server Test", func() {
 
 //Initialize a server for testing
 func setup() (*server.Server, string, error) {
+	kubeHost := os.Getenv("KUBE_HOST")
 	testServer := server.NewServer()
+
+	if kubeHost == "" {
+		kubeHost = "127.0.0.1:8080"
+	}
 	clientConfig := restclient.Config{
-		Host: "127.0.0.1:8080",
+		Host: kubeHost,
 	}
 	err := server.Init(clientConfig)
 	if err != nil {
