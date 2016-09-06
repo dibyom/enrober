@@ -71,6 +71,21 @@ func NewServer() (server *Server) {
 	return server
 }
 
+// Copied from https://github.com/30x/authsdk/blob/master/apigee.go#L19
+//
+// TODO: Turn this into some Go-based Apigee client/SDK to replace authsdk
+var apigeeApiHost string
+
+func init() {
+	envVar := os.Getenv("AUTH_API_HOST")
+
+	if envVar == "" {
+		apigeeApiHost = "api.enterprise.apigee.com"
+	} else {
+		apigeeApiHost = envVar
+	}
+}
+
 //Start the server
 func (server *Server) Start() error {
 	return http.ListenAndServe(":9000", server.Router)
@@ -158,8 +173,8 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		httpClient := &http.Client{}
 
 		//construct URL
-		apigeeURL := fmt.Sprintf("https://api.enterprise.apigee.com/v1/organizations/%s/environments/%s/keyvaluemaps",
-			apigeeOrgName, apigeeEnvName)
+		apigeeURL := fmt.Sprintf("https://%s/v1/organizations/%s/environments/%s/keyvaluemaps",
+			apigeeApiHost, apigeeOrgName, apigeeEnvName)
 
 		//create JSON body
 		kvmBody := apigeeKVMBody{
