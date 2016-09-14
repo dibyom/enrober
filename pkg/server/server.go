@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -190,7 +191,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 			Entry: []apigeeKVMEntry{
 				apigeeKVMEntry{
 					Name:  apigeeKVMPKName,
-					Value: publicKey,
+					Value: base64.StdEncoding.EncodeToString([]byte(publicKey)),
 				},
 			},
 		}
