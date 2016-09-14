@@ -24,6 +24,10 @@ import (
 	"github.com/30x/enrober/pkg/helper"
 )
 
+const (
+	apigeeKVMName = "routing"
+)
+
 //Global Vars
 var (
 	//Kubernetes Client
@@ -173,12 +177,11 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		httpClient := &http.Client{}
 
 		//construct URL
-		apigeeURL := fmt.Sprintf("https://%s/v1/organizations/%s/environments/%s/keyvaluemaps",
-			apigeeApiHost, apigeeOrgName, apigeeEnvName)
+		apigeeKVMURL := fmt.Sprintf("https://%s/v1/organizations/%s/environments/%s/keyvaluemaps", apigeeApiHost, apigeeOrgName, apigeeEnvName)
 
 		//create JSON body
 		kvmBody := apigeeKVMBody{
-			Name: "routing",
+			Name: apigeeKVMName,
 			Entry: []apigeeKVMEntry{
 				apigeeKVMEntry{
 					Name:  "public-key",
@@ -190,7 +193,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		b := new(bytes.Buffer)
 		json.NewEncoder(b).Encode(kvmBody)
 
-		req, err := http.NewRequest("POST", apigeeURL, b)
+		req, err := http.NewRequest("POST", apigeeKVMURL, b)
 		if err != nil {
 
 		}
@@ -212,9 +215,14 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 			var retryFLag bool
 			if resp.StatusCode == 409 {
 				b2 := new(bytes.Buffer)
+				updateKVMURL := fmt.Sprintf("%s/%s", apigeeKVMURL, apigeeKVMName) // Use non-CPS endpoint by default
 
-				retryReq, err := http.NewRequest("POST", apigeeURL+"/routing/entries", b2)
-				fmt.Printf("retry URL: %v\n", retryReq.URL.String())
+				if isCPSEnabledForOrg(apigeeOrgName, r.Header.Get("Authorization")) {
+					updateKVMURL += "/entries" // Update the KVM URL to use the CPS endpoint
+				}
+
+				retryReq, err := http.NewRequest("POST", updateKVMURL, b2)
+				fmt.Printf("The update KVM URL: %v\n", retryReq.URL.String())
 
 				retryReq.Header.Add("Authorization", r.Header.Get("Authorization"))
 				retryReq.Header.Add("Content-Type", "application/json")
@@ -998,4 +1006,49 @@ func getDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 	w.Write(logBuffer.Bytes())
 
 	helper.LogInfo.Printf("Got Logs for Deployment: %v\n", dep.GetName())
+}
+
+func isCPSEnabledForOrg(orgName, authzHeader string) bool {
+	cpsEnabled := false
+	httpClient := &http.Client{}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/v1/organizations/%s", apigeeApiHost, orgName), nil)
+
+	fmt.Printf("Checking if %s has CPS enabled using URL: %v\n", orgName, req.URL.String())
+
+	req.Header.Add("Authorization", authzHeader)
+
+	res, err := httpClient.Do(req)
+
+	defer res.Body.Close()
+
+	if err != nil {
+		fmt.Printf("Error checking for CPS: %v", err)
+	} else {
+		var rawOrg interface{}
+
+		err := json.NewDecoder(res.Body).Decode(&rawOrg)
+
+		if err != nil {
+			fmt.Printf("Error unmarshalling response: %v\n", err)
+		} else {
+			org := rawOrg.(map[string]interface{})
+			orgProps := org["properties"].(map[string]interface{})
+			orgProp := orgProps["property"].([]interface{})
+
+			for _, rawProp := range orgProp {
+				prop := rawProp.(map[string]interface{})
+
+				if prop["name"] == "features.isCpsEnabled" {
+					if prop["value"] == "true" {
+						cpsEnabled = true
+					}
+
+					break
+				}
+			}
+		}
+	}
+
+	return cpsEnabled
 }
