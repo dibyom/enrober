@@ -222,7 +222,15 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 				updateKVMURL := fmt.Sprintf("%s/%s", apigeeKVMURL, apigeeKVMName) // Use non-CPS endpoint by default
 
 				if isCPSEnabledForOrg(apigeeOrgName, r.Header.Get("Authorization")) {
+					// When using CPS, the API endpoint is different and instead of sending the whole KVM body, we can only send
+					// the KVM entry to update.  (This will work for now since we are only persisting one key but in the future
+					// we might need to update this to make N calls, one per key.)
 					updateKVMURL += "/entries" // Update the KVM URL to use the CPS endpoint
+
+					json.NewEncoder(b2).Encode(kvmBody.Entry[0])
+				} else {
+					// When not using CPS, send the whole KVM body to update all keys in the KVM.
+					json.NewEncoder(b2).Encode(kvmBody) // Non-CPS takes the whole payload
 				}
 
 				retryReq, err := http.NewRequest("POST", updateKVMURL, b2)
@@ -230,8 +238,6 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 
 				retryReq.Header.Add("Authorization", r.Header.Get("Authorization"))
 				retryReq.Header.Add("Content-Type", "application/json")
-
-				json.NewEncoder(b2).Encode(kvmBody.Entry[0])
 
 				resp2, err := httpClient.Do(retryReq)
 				if err != nil {
@@ -252,7 +258,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 				}
 
 				if resp2.StatusCode != 201 && resp2.StatusCode != 409 {
-					errorMessage := fmt.Sprintf("Couldn't create KVM entry, Status Code: %d", resp2.StatusCode)
+					errorMessage := fmt.Sprintf("Couldn't create KVM entry (Status Code: %d): %v", resp2.StatusCode, retryResponse.Message)
 					http.Error(w, errorMessage, http.StatusInternalServerError)
 					helper.LogError.Printf(errorMessage + "\n")
 					return
@@ -1058,6 +1064,8 @@ func isCPSEnabledForOrg(orgName, authzHeader string) bool {
 			}
 		}
 	}
+
+	fmt.Printf("  CPS Enabled: %v", cpsEnabled)
 
 	return cpsEnabled
 }
