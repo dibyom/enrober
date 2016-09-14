@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	apigeeKVMName = "routing"
+	apigeeKVMName   = "routing"
+	apigeeKVMPKName = "public-key"
 )
 
 //Global Vars
@@ -188,7 +189,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 			Name: apigeeKVMName,
 			Entry: []apigeeKVMEntry{
 				apigeeKVMEntry{
-					Name:  "public-key",
+					Name:  apigeeKVMPKName,
 					Value: publicKey,
 				},
 			},
@@ -225,6 +226,7 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 					// When using CPS, the API endpoint is different and instead of sending the whole KVM body, we can only send
 					// the KVM entry to update.  (This will work for now since we are only persisting one key but in the future
 					// we might need to update this to make N calls, one per key.)
+					updateKVMURL = fmt.Sprintf("%s/entries/%s", updateKVMURL, apigeeKVMPKName)
 					updateKVMURL += "/entries" // Update the KVM URL to use the CPS endpoint
 
 					json.NewEncoder(b2).Encode(kvmBody.Entry[0])
