@@ -67,6 +67,10 @@ func NewServer() (server *Server) {
 	router.Path("/environments/{org}:{env}/deployments/{deployment}").Methods("DELETE").HandlerFunc(deleteDeployment)
 	router.Path("/environments/{org}:{env}/deployments/{deployment}/logs").Methods("GET").HandlerFunc(getDeploymentLogs)
 
+	//health check
+	router.Path("/environments/status/").Methods("GET").HandlerFunc(getStatus)
+	router.Path("/environments/status").Methods("GET").HandlerFunc(getStatus)
+
 	loggedRouter := handlers.CombinedLoggingHandler(os.Stdout, router)
 
 	server = &Server{
@@ -1006,6 +1010,11 @@ func getDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 	w.Write(logBuffer.Bytes())
 
 	helper.LogInfo.Printf("Got Logs for Deployment: %v\n", dep.GetName())
+}
+
+func getStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("OK"))
 }
 
 func isCPSEnabledForOrg(orgName, authzHeader string) bool {
