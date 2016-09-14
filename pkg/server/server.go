@@ -200,8 +200,12 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 
 		req, err := http.NewRequest("POST", apigeeKVMURL, b)
 		if err != nil {
-
+			errorMessage := fmt.Sprintf("Unable to create request (Create KVM): %v", err)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage + "\n")
+			return
 		}
+
 		//Must pass through the authz header
 		req.Header.Add("Authorization", r.Header.Get("Authorization"))
 		req.Header.Add("Content-Type", "application/json")
@@ -215,9 +219,12 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 		}
 		defer resp.Body.Close()
 
+		// If the response was not a 201, we need to check if the response was a 409 because this means the KVM exists
+		// already and we'll need to update the KVM value(s).
 		if resp.StatusCode != 201 {
-			//Attempt to just create the entry not the KVM map
-			var retryFLag bool
+			var retryFlag bool
+
+			// If the KVM already exists, we need to update its value(s).
 			if resp.StatusCode == 409 {
 				b2 := new(bytes.Buffer)
 				updateKVMURL := fmt.Sprintf("%s/%s", apigeeKVMURL, apigeeKVMName) // Use non-CPS endpoint by default
@@ -227,7 +234,6 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 					// the KVM entry to update.  (This will work for now since we are only persisting one key but in the future
 					// we might need to update this to make N calls, one per key.)
 					updateKVMURL = fmt.Sprintf("%s/entries/%s", updateKVMURL, apigeeKVMPKName)
-					updateKVMURL += "/entries" // Update the KVM URL to use the CPS endpoint
 
 					json.NewEncoder(b2).Encode(kvmBody.Entry[0])
 				} else {
@@ -235,13 +241,21 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 					json.NewEncoder(b2).Encode(kvmBody) // Non-CPS takes the whole payload
 				}
 
-				retryReq, err := http.NewRequest("POST", updateKVMURL, b2)
-				fmt.Printf("The update KVM URL: %v\n", retryReq.URL.String())
+				updateKVMReq, err := http.NewRequest("POST", updateKVMURL, b2)
 
-				retryReq.Header.Add("Authorization", r.Header.Get("Authorization"))
-				retryReq.Header.Add("Content-Type", "application/json")
+				if err != nil {
+					errorMessage := fmt.Sprintf("Unable to create request (Update KVM): %v", err)
+					http.Error(w, errorMessage, http.StatusInternalServerError)
+					helper.LogError.Printf(errorMessage + "\n")
+					return
+				}
 
-				resp2, err := httpClient.Do(retryReq)
+				fmt.Printf("The update KVM URL: %v\n", updateKVMReq.URL.String())
+
+				updateKVMReq.Header.Add("Authorization", r.Header.Get("Authorization"))
+				updateKVMReq.Header.Add("Content-Type", "application/json")
+
+				resp2, err := httpClient.Do(updateKVMReq)
 				if err != nil {
 					errorMessage := fmt.Sprintf("Error creating entry in existing Apigee KVM: %v", err)
 					http.Error(w, errorMessage, http.StatusInternalServerError)
@@ -250,24 +264,29 @@ func createEnvironment(w http.ResponseWriter, r *http.Request) {
 				}
 				defer resp2.Body.Close()
 
-				var retryResponse retryResponse
+				var updateKVMRes retryResponse
+
 				//Decode response
-				err = json.NewDecoder(resp2.Body).Decode(&retryResponse)
+				err = json.NewDecoder(resp2.Body).Decode(&updateKVMRes)
+
 				if err != nil {
 					fmt.Printf("Failed to decode response: %v\n", err)
 					http.Error(w, "Failed to decode response", http.StatusInternalServerError)
 					return
 				}
 
-				if resp2.StatusCode != 201 && resp2.StatusCode != 409 {
-					errorMessage := fmt.Sprintf("Couldn't create KVM entry (Status Code: %d): %v", resp2.StatusCode, retryResponse.Message)
+				// Updating a KVM returns a 200 on success so if it's not a 200, it's a failure
+				if resp2.StatusCode != 200 {
+					errorMessage := fmt.Sprintf("Couldn't create KVM entry (Status Code: %d): %v", resp2.StatusCode, updateKVMRes.Message)
 					http.Error(w, errorMessage, http.StatusInternalServerError)
 					helper.LogError.Printf(errorMessage + "\n")
 					return
 				}
-				retryFLag = true
+
+				retryFlag = true
 			}
-			if !retryFLag {
+
+			if !retryFlag {
 				errorMessage := fmt.Sprintf("Expected 201 or 409, got: %v", resp.StatusCode)
 				http.Error(w, errorMessage, http.StatusInternalServerError)
 				helper.LogError.Printf(errorMessage + "\n")
@@ -1030,6 +1049,12 @@ func isCPSEnabledForOrg(orgName, authzHeader string) bool {
 	httpClient := &http.Client{}
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/v1/organizations/%s", apigeeApiHost, orgName), nil)
+
+	if err != nil {
+		fmt.Printf("Error checking for CPS: %v", err)
+
+		return cpsEnabled
+	}
 
 	fmt.Printf("Checking if %s has CPS enabled using URL: %v\n", orgName, req.URL.String())
 
