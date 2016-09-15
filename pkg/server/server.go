@@ -972,6 +972,19 @@ func getDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 		tail = int64(tailInt)
 	}
 
+	previousString := queries.Get("previous")
+	var previous bool
+	if previousString != "" {
+		var err error
+		previous, err = strconv.ParseBool(previousString)
+		if err != nil {
+			errorMessage := fmt.Sprintf("Invalid previous value: %s\n", err)
+			http.Error(w, errorMessage, http.StatusInternalServerError)
+			helper.LogError.Printf(errorMessage)
+			return
+		}
+	}
+
 	//Get the deployment
 	dep, err := client.Deployments(pathVars["org"] + "-" + pathVars["env"]).Get(pathVars["deployment"])
 	if err != nil {
@@ -1010,6 +1023,10 @@ func getDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 
 		if tail != -1 {
 			podLogOpts.TailLines = &tail
+		}
+
+		if previous {
+			podLogOpts.Previous = previous
 		}
 
 		req := podInterface.GetLogs(pod.Name, podLogOpts)
