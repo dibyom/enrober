@@ -2,8 +2,8 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -679,7 +679,7 @@ func createDeployment(w http.ResponseWriter, r *http.Request) {
 		},
 		Spec: extensions.DeploymentSpec{
 			RevisionHistoryLimit: &tempInt,
-			Replicas:             tempJSON.Replicas,
+			Replicas:             *tempJSON.Replicas,
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{
 					"component": tempPTS.Labels["component"],
@@ -827,7 +827,10 @@ func updateDeployment(w http.ResponseWriter, r *http.Request) {
 	//Need to cache the previous annotations
 	cacheAnnotations := getDep.Spec.Template.Annotations
 
-	getDep.Spec.Replicas = tempJSON.Replicas
+	//Only set the replica count if the passed variable
+	if tempJSON.Replicas != nil {
+		getDep.Spec.Replicas = *tempJSON.Replicas
+	}
 	getDep.Spec.Template = tempPTS
 
 	//Replace the privateHosts and publicHosts annotations with cached ones
